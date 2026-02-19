@@ -168,7 +168,7 @@ wheels = [
 ]
 
 [[package]]
-name = "cdp-python-backend-template"
+name = "ai-uc-rag-evaluation-runtime"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

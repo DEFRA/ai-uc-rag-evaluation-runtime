@@ -1,8 +1,8 @@
-# cdp-python-backend-template
+# ai-uc-rag-evaluation-runtime
 
 This is work-in-progress. See [To Do List](./TODO.md)
 
-- [cdp-python-backend-template](#cdp-python-backend-template)
+- [ai-uc-rag-evaluation-runtime](#ai-uc-rag-evaluation-runtime)
   - [Requirements](#requirements)
     - [Python](#python)
     - [Linting and Formatting](#linting-and-formatting)
