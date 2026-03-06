@@ -2,7 +2,7 @@
 
 ## Purpose of the System
 
-The `ai-uc-content-swam-runtime` is a Python-based backend service that is an example implimentation of an agent swarm. The service is built using the FastAPI framework.
+The `ai-uc-rag-evaluation-runtime` is a Python-based backend service that is an example implementation of RAG system. The service is built using the FastAPI framework.
 
 ## Architecture Overview
 

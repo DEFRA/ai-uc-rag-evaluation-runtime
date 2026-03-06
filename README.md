@@ -1,7 +1,5 @@
 # ai-uc-rag-evaluation-runtime
 
-This is work-in-progress. See [To Do List](./TODO.md)
-
 - [ai-uc-rag-evaluation-runtime](#ai-uc-rag-evaluation-runtime)
   - [Requirements](#requirements)
     - [Python](#python)
@@ -39,8 +37,6 @@ source .venv/bin/activate
 # install the pre-commit hooks
 pre-commit install
 ```
-
-This opinionated template uses the [`Fast API`](https://fastapi.tiangolo.com/) Python API framework.
 
 ### Environment Variable Configuration
 
@@ -125,7 +121,7 @@ Ruff is configured in the `.ruff.toml` file
 
 ### Docker
 
-This repository uses Docker throughput its lifecycle i.e. both for local development and the environments. A benefit of this is that environment variables & secrets are managed consistently throughout the lifecycle
+This repository uses Docker throughout its lifecycle i.e. both for local development and the environments. A benefit of this is that environment variables & secrets are managed consistently throughout the lifecycle
 
 See the `Dockerfile` and `compose.yml` for details
 
@@ -187,7 +183,7 @@ Testing follows the [FastApi documented approach](https://fastapi.tiangolo.com/t
 To test the application run:
 
 ```bash
-uv run pytest
+uv run task test
 ```
 
 ## API endpoints

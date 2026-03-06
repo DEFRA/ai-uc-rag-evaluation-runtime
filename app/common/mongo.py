@@ -41,7 +41,7 @@ async def get_db(client: AsyncMongoClient = Depends(get_mongo_client)) -> AsyncD
     return db
 
 
-async def check_connection(client: AsyncMongoClient):
+async def check_connection(client: AsyncMongoClient) -> None:
     database = await get_db(client)
     response = await database.command("ping")
     logger.info("MongoDB PING %s", response)

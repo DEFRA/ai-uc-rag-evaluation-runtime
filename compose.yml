@@ -27,7 +27,7 @@ services:
     networks:
       - cdp-tenant
     ports:
-      - "27017:27017"
+      - "28017:27017"
     volumes:
       - mongodb-data:/data
     restart: always
@@ -37,7 +37,7 @@ services:
       context: .
       target: development
     ports:
-      - 8085:8085
+      - 9085:8085
     links:
       - "localstack:localstack"
       - "mongodb:mongodb"

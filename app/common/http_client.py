@@ -1,4 +1,5 @@
 from logging import getLogger
+from typing import Any
 
 import httpx
 
@@ -26,13 +27,13 @@ sync_proxy_mounts = (
 )
 
 
-async def async_hook_request_tracing(request):
+async def async_hook_request_tracing(request: httpx.Request) -> None:
     trace_id = ctx_trace_id.get(None)
     if trace_id:
         request.headers[config.tracing_header] = trace_id
 
 
-def hook_request_tracing(request):
+def hook_request_tracing(request: httpx.Request) -> None:
     trace_id = ctx_trace_id.get(None)
     if trace_id:
         request.headers[config.tracing_header] = trace_id
@@ -48,7 +49,7 @@ def create_async_client(request_timeout: int = 30) -> httpx.AsyncClient:
     Returns:
         Configured httpx.AsyncClient instance
     """
-    client_kwargs = {
+    client_kwargs: dict[str, Any] = {
         "timeout": request_timeout,
         "event_hooks": {"request": [async_hook_request_tracing]},
     }
@@ -69,7 +70,7 @@ def create_client(request_timeout: int = 30) -> httpx.Client:
     Returns:
         Configured httpx.Client instance
     """
-    client_kwargs = {
+    client_kwargs: dict[str, Any] = {
         "timeout": request_timeout,
         "event_hooks": {"request": [hook_request_tracing]},
     }

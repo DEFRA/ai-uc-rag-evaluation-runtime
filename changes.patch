@@ -1,0 +1,1209 @@
+diff --git a/.github/copilot-instructions.md b/.github/copilot-instructions.md
+new file mode 100644
+index 0000000..51e236c
+--- /dev/null
++++ b/.github/copilot-instructions.md
+@@ -0,0 +1 @@
++refer to the docs files in the docs/ai directory for more details on AI guidelines and project context.
+\ No newline at end of file
+diff --git a/.github/example.dependabot.yml b/.github/example.dependabot.yml
+deleted file mode 100644
+index ea67d78..0000000
+--- a/.github/example.dependabot.yml
++++ /dev/null
+@@ -1,72 +0,0 @@
+-version: 2
+-
+-updates:
+-  # Update npm packages
+-  - package-ecosystem: pip
+-    directory: /
+-    open-pull-requests-limit: 10
+-
+-    # Group packages into shared PR
+-    groups:
+-      build:
+-        patterns:
+-          - '@babel/*'
+-          - 'autoprefixer'
+-          - 'babel-plugin-module-resolver'
+-          - 'babel-loader'
+-          - 'babel-plugin-transform-import-meta'
+-          - 'tsx'
+-
+-      lint:
+-        patterns:
+-          - '@typescript-eslint/*'
+-          - 'prettier'
+-          - 'stylelint'
+-          - 'stylelint-*'
+-          - 'typescript'
+-
+-      logging:
+-        patterns:
+-          - '*-pino'
+-          - '*-pino-format'
+-          - 'pino'
+-          - 'pino-*'
+-
+-      tools:
+-        patterns:
+-          - 'babel-jest'
+-          - 'husky'
+-          - 'jest'
+-          - 'nodemon'
+-          - 'npm-run-all'
+-
+-      types:
+-        patterns:
+-          - '@types/*'
+-
+-    ignore:
+-      - dependency-name: 'eslint-*'
+-      - dependency-name: 'eslint'
+-      - dependency-name: '@typescript-eslint/*'
+-
+-    # Schedule run every Monday, local time
+-    schedule:
+-      interval: weekly
+-      time: '10:30'
+-      timezone: 'Europe/London'
+-
+-    versioning-strategy: increase
+-
+-    allow:
+-      # Include direct package.json updates
+-      - dependency-type: direct
+-
+-  # Update GitHub Actions
+-  - package-ecosystem: github-actions
+-    directory: /
+-
+-    # Schedule run every Monday, local time
+-    schedule:
+-      interval: weekly
+-      time: '10:30'
+-      timezone: 'Europe/London'
+diff --git a/.github/workflows/check-pull-request.yml b/.github/workflows/check-pull-request.yml
+index 7a3553a..1ba42ec 100644
+--- a/.github/workflows/check-pull-request.yml
++++ b/.github/workflows/check-pull-request.yml
+@@ -12,6 +12,11 @@ on:
+       - ready_for_review
+ 
+ jobs:
++  security-scan:
++    name: Security Scanning
++    uses: ./.github/workflows/scan.yml
++    secrets: inherit
++
+   pr-validator:
+     name: Run Pull Request Checks
+     runs-on: ubuntu-latest
+@@ -19,26 +24,8 @@ jobs:
+       - name: Checkout code
+         uses: actions/checkout@v4
+ 
+-      - name: Test code and Create Test Coverage Reports
+-        uses: actions/setup-python@v5
+-        with:
+-          python-version: 3.12
+-          cache: 'pip'
+-      - run: |
+-          pipx install uv
+-          uv sync --frozen
+-          uv run ruff check
+-          uv run pytest
+-
+       - name: Test Docker Image Build
+         run: |
+           set +e
+           docker build --no-cache --tag cdp-python-backend-template .
+           exit $?
+-
+-#      - name: SonarCloud Scan
+-#        if: github.actor != 'dependabot[bot]'
+-#        uses: SonarSource/sonarcloud-github-action@master
+-#        env:
+-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-#          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+diff --git a/.github/workflows/publish-hotfix.yml b/.github/workflows/publish-hotfix.yml
+index f458029..0607a9a 100644
+--- a/.github/workflows/publish-hotfix.yml
++++ b/.github/workflows/publish-hotfix.yml
+@@ -13,34 +13,22 @@ env:
+   AWS_ACCOUNT_ID: "094954420758"
+ 
+ jobs:
++  security-scan:
++    name: Security Scanning
++    uses: ./.github/workflows/scan.yml
++    secrets: inherit
++
+   build:
+     name: CDP-build-hotfix-workflow
++    needs: security-scan
+     runs-on: ubuntu-latest
+     steps:
+       - name: Check out code
+         uses: actions/checkout@v4
+         with:
+-          fetch-depth: 0 # Depth 0 is required for branch-based versioning
+-
+-      - name: Test code and Create Test Coverage Reports
+-        uses: actions/setup-python@v5
+-        with:
+-          python-version: 3.12
+-          cache: 'pip'
+-      - run: |
+-          pipx install uv
+-          uv sync --frozen
+-          uv run ruff check
+-          uv run pytest
++          fetch-depth: 0
+ 
+       - name: Publish Hot Fix
+         uses: DEFRA/cdp-build-action/build-hotfix@main
+         with:
+           github-token: ${{ secrets.GITHUB_TOKEN }}
+-
+-#     - run: npm install && npm test
+-#     - name: SonarCloud Scan
+-#       uses: SonarSource/sonarcloud-github-action@master
+-#       env:
+-#         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-#         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
+index 4c65dd6..cd82048 100644
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -15,32 +15,23 @@ env:
+   AWS_ACCOUNT_ID: "094954420758"
+ 
+ jobs:
++  security-scan:
++    name: Security Scanning
++    uses: ./.github/workflows/scan.yml
++    secrets: inherit
++
+   build:
+     if: github.run_number != 1
+     name: CDP-build-workflow
++    needs: security-scan
+     runs-on: ubuntu-latest
+     steps:
+       - name: Check out code
+         uses: actions/checkout@v4
++        with:
++          fetch-depth: 0
+ 
+       - name: Build and Publish
+         uses: DEFRA/cdp-build-action/build@main
+         with:
+           github-token: ${{ secrets.GITHUB_TOKEN }}
+-
+-      - name: Test code and Create Test Coverage Reports
+-        uses: actions/setup-python@v5
+-        with:
+-          python-version: 3.12
+-          cache: 'pip'
+-      - run: |
+-          pipx install uv
+-          uv sync --frozen
+-          uv run ruff check
+-          uv run pytest
+-
+-#      - name: SonarCloud Scan
+-#        uses: SonarSource/sonarcloud-github-action@master
+-#        env:
+-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-#          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+diff --git a/.github/workflows/scan.yml b/.github/workflows/scan.yml
+new file mode 100644
+index 0000000..a4b0590
+--- /dev/null
++++ b/.github/workflows/scan.yml
+@@ -0,0 +1,69 @@
++on:
++  schedule:
++    - cron: '0 1 * * *'
++  workflow_dispatch:
++  workflow_call:
++
++jobs:
++  sonarcloud:
++    name: SonarCloud Scan
++    if: ${{ github.event_name != 'schedule' && github.actor != 'dependabot[bot]' }}
++    runs-on: ubuntu-latest
++    steps:
++      - name: Check out code
++        uses: actions/checkout@v6
++        with:
++          fetch-depth: 0
++
++      - name: Set up Python
++        uses: actions/setup-python@v5
++        with:
++          python-version: 3.13
++          cache: 'pip'
++
++      - name: Test code and Create Test Coverage Reports
++        run: |
++          pipx install uv
++          uv sync --locked
++          mkdir -p coverage
++          chmod -R a+rw ./coverage
++          uv run task test
++
++      - name: SonarCloud Scan
++        uses: SonarSource/sonarqube-scan-action@v6.0.0
++        env:
++          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
++
++  trivy-scan:
++    name: Trivy Vulnerability Scan
++    runs-on: ubuntu-latest
++    steps:
++      - name: Check out code
++        uses: actions/checkout@v6
++        with:
++          fetch-depth: 0
++
++      - name: Check for unpinned dependencies
++        run: |
++          chmod +x ./scripts/check-unpinned-dependencies.sh
++          ./scripts/check-unpinned-dependencies.sh
++
++      - name: Run Aqua Trivy scan
++        id: trivy-scan
++        uses: aquasecurity/trivy-action@0.33.1
++        with:
++          scan-ref: .
++          scan-type: repository
++          format: table
++          exit-code: 1
++          trivyignores: .trivyignore
++          severity: CRITICAL,HIGH,MEDIUM,LOW
++          limit-severities-for-sarif: true
++        continue-on-error: true
++        env:
++          TRIVY_INCLUDE_DEV_DEPS: "true"
++
++      - name: Fail if vulnerabilities found
++        if: ${{ steps.trivy-scan.outcome == 'failure' }}
++        run: exit 1
+diff --git a/.gitignore b/.gitignore
+index 0ab2877..8456683 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -198,3 +198,4 @@ cython_debug/
+ compose/secrets.env
+ 
+ coverage*
++/CLAUDE.md
+diff --git a/.pre-commit-config.yaml b/.pre-commit-config.yaml
+deleted file mode 100644
+index 6eea6e0..0000000
+--- a/.pre-commit-config.yaml
++++ /dev/null
+@@ -1,26 +0,0 @@
+-repos:
+-  - repo: https://github.com/astral-sh/ruff-pre-commit
+-    rev: v0.9.7
+-    hooks:
+-      - id: ruff
+-        args: [--fix]
+-      - id: ruff-format
+-
+-  - repo: https://github.com/pre-commit/pre-commit-hooks
+-    rev: v5.0.0
+-    hooks:
+-      - id: trailing-whitespace
+-      - id: end-of-file-fixer
+-      - id: check-yaml
+-      - id: check-toml
+-      - id: check-added-large-files
+-
+-  - repo: local
+-    hooks:
+-      - id: pytest
+-        name: pytest
+-        entry: .venv/bin/pytest
+-        language: system
+-        pass_filenames: false
+-        always_run: true
+-        types: [python]
+diff --git a/app/__init__.py b/.trivyignore
+similarity index 100%
+rename from app/__init__.py
+rename to .trivyignore
+diff --git a/Dockerfile b/Dockerfile
+index 3deaed3..1b9b773 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -25,7 +25,7 @@ ARG PORT_DEBUG=8086
+ ENV PORT=${PORT}
+ EXPOSE ${PORT} ${PORT_DEBUG}
+ 
+-CMD [ "-m", "app.main" ]
++CMD [ "/home/nonroot/.venv/bin/ai-uc-rag-evaluation-runtime" ]
+ 
+ FROM defradigital/python:${PARENT_VERSION} AS production
+ 
+@@ -56,4 +56,4 @@ ARG PORT
+ ENV PORT=${PORT}
+ EXPOSE ${PORT}
+ 
+-CMD [ "-m", "app.main" ]
++CMD [ "/home/nonroot/.venv/bin/ai-uc-rag-evaluation-runtime" ]
+diff --git a/README.md b/README.md
+index 07cb027..6669a2a 100644
+--- a/README.md
++++ b/README.md
+@@ -1,7 +1,5 @@
+ # ai-uc-rag-evaluation-runtime
+ 
+-This is work-in-progress. See [To Do List](./TODO.md)
+-
+ - [ai-uc-rag-evaluation-runtime](#ai-uc-rag-evaluation-runtime)
+   - [Requirements](#requirements)
+     - [Python](#python)
+@@ -40,8 +38,6 @@ source .venv/bin/activate
+ pre-commit install
+ ```
+ 
+-This opinionated template uses the [`Fast API`](https://fastapi.tiangolo.com/) Python API framework.
+-
+ ### Environment Variable Configuration
+ 
+ The application uses Pydantic's `BaseSettings` for configuration management in `app/config.py`, automatically mapping environment variables to configuration fields.
+@@ -125,7 +121,7 @@ Ruff is configured in the `.ruff.toml` file
+ 
+ ### Docker
+ 
+-This repository uses Docker throughput its lifecycle i.e. both for local development and the environments. A benefit of this is that environment variables & secrets are managed consistently throughout the lifecycle
++This repository uses Docker throughout its lifecycle i.e. both for local development and the environments. A benefit of this is that environment variables & secrets are managed consistently throughout the lifecycle
+ 
+ See the `Dockerfile` and `compose.yml` for details
+ 
+@@ -187,7 +183,7 @@ Testing follows the [FastApi documented approach](https://fastapi.tiangolo.com/t
+ To test the application run:
+ 
+ ```bash
+-uv run pytest
++uv run task test
+ ```
+ 
+ ## API endpoints
+diff --git a/app/common/__init__.py b/app/common/__init__.py
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/app/common/http_client.py b/app/common/http_client.py
+index 3edbba6..11499c7 100644
+--- a/app/common/http_client.py
++++ b/app/common/http_client.py
+@@ -1,4 +1,5 @@
+ from logging import getLogger
++from typing import Any
+ 
+ import httpx
+ 
+@@ -26,13 +27,13 @@ sync_proxy_mounts = (
+ )
+ 
+ 
+-async def async_hook_request_tracing(request):
++async def async_hook_request_tracing(request: httpx.Request) -> None:
+     trace_id = ctx_trace_id.get(None)
+     if trace_id:
+         request.headers[config.tracing_header] = trace_id
+ 
+ 
+-def hook_request_tracing(request):
++def hook_request_tracing(request: httpx.Request) -> None:
+     trace_id = ctx_trace_id.get(None)
+     if trace_id:
+         request.headers[config.tracing_header] = trace_id
+@@ -48,7 +49,7 @@ def create_async_client(request_timeout: int = 30) -> httpx.AsyncClient:
+     Returns:
+         Configured httpx.AsyncClient instance
+     """
+-    client_kwargs = {
++    client_kwargs: dict[str, Any] = {
+         "timeout": request_timeout,
+         "event_hooks": {"request": [async_hook_request_tracing]},
+     }
+@@ -69,7 +70,7 @@ def create_client(request_timeout: int = 30) -> httpx.Client:
+     Returns:
+         Configured httpx.Client instance
+     """
+-    client_kwargs = {
++    client_kwargs: dict[str, Any] = {
+         "timeout": request_timeout,
+         "event_hooks": {"request": [hook_request_tracing]},
+     }
+diff --git a/app/common/log_utils.py b/app/common/log_utils.py
+index 941792d..2c057a4 100644
+--- a/app/common/log_utils.py
++++ b/app/common/log_utils.py
+@@ -1,11 +1,12 @@
+ import logging
++from typing import Any
+ 
+ from app.common.tracing import ctx_request, ctx_response, ctx_trace_id
+ 
+ 
+ # Adds additional ECS fields to the logger.
+ class ExtraFieldsFilter(logging.Filter):
+-    def filter(self, record):
++    def filter(self, record: logging.LogRecord) -> bool:
+         trace_id = ctx_trace_id.get("")
+         req = ctx_request.get(None)
+         resp = ctx_response.get(None)
+@@ -25,9 +26,9 @@ class ExtraFieldsFilter(logging.Filter):
+ 
+ 
+ class EndpointFilter(logging.Filter):
+-    def __init__(self, path, *args, **kwargs):
++    def __init__(self, path: str, *args: Any, **kwargs: Any) -> None:
+         super().__init__(*args, **kwargs)
+         self._path = path
+ 
+-    def filter(self, record):
++    def filter(self, record: logging.LogRecord) -> bool:
+         return record.getMessage().find(self._path) == -1
+diff --git a/app/common/metrics.py b/app/common/metrics.py
+index 7b74bb1..d5f32be 100644
+--- a/app/common/metrics.py
++++ b/app/common/metrics.py
+@@ -1,4 +1,5 @@
+ from logging import getLogger
++from typing import Any
+ 
+ from aws_embedded_metrics import metric_scope
+ from aws_embedded_metrics.storage_resolution import StorageResolution
+@@ -10,15 +11,18 @@ logger = getLogger(__name__)
+ # metrics.put_metric always seems to thrown an exception, even though the metrics are being sent to cloudwatch
+ # This is a related issue: https://github.com/awslabs/aws-embedded-metrics-python/issues/52
+ # More time needs to be spent on this, but for now, the metrics are being sent to cloudwatch
++# Setting metrics to Any as have no idea what this should be.
+ @metric_scope
+-def __put_metric(metric_name, value, unit, metrics):
++def __put_metric(metric_name: str, value: float, unit: str, metrics: Any) -> None:
+     logger.debug("put metric: %s - %s - %s", metric_name, value, unit)
+     metrics.put_metric(metric_name, value, unit, StorageResolution.STANDARD)
+ 
+ 
+ # Use this counter function in the app, not the decorated function __put_metric.
+ # This wraps __put_metric and handles the exceptions, allows the app to continue running
+-def counter(metric_name, value):
++#
++# This does not set metric on the call to __put_metric not sure why?
++def counter(metric_name: str, value: float) -> None:
+     try:
+         __put_metric(metric_name, value, "Count")
+     except Exception as e:
+diff --git a/app/common/mongo.py b/app/common/mongo.py
+index 8065487..112828b 100644
+--- a/app/common/mongo.py
++++ b/app/common/mongo.py
+@@ -41,7 +41,7 @@ async def get_db(client: AsyncMongoClient = Depends(get_mongo_client)) -> AsyncD
+     return db
+ 
+ 
+-async def check_connection(client: AsyncMongoClient):
++async def check_connection(client: AsyncMongoClient) -> None:
+     database = await get_db(client)
+     response = await database.command("ping")
+     logger.info("MongoDB PING %s", response)
+diff --git a/app/common/tls.py b/app/common/tls.py
+index edc662f..38e3092 100644
+--- a/app/common/tls.py
++++ b/app/common/tls.py
+@@ -1,4 +1,5 @@
+ import base64
++import binascii
+ import os
+ import ssl
+ import tempfile
+@@ -12,13 +13,13 @@ ctx: ssl.SSLContext | None = None
+ 
+ # Custom CA Certificates are passed to services on deployment
+ # as base64 encoded environment variables with the prefix `TRUSTSTORE_`
+-def extract_all_certs():
++def extract_all_certs() -> dict[str, str]:
+     certs = {}
+     for var_name, var_value in os.environ.items():
+         if var_name.startswith("TRUSTSTORE_"):
+             try:
+                 decoded_value = base64.b64decode(var_value)
+-            except base64.binascii.Error as err:
++            except binascii.Error as err:
+                 logger.error("Error decoding value for %s. Skipping. %s", var_name, err)
+                 continue
+             with tempfile.NamedTemporaryFile(
+@@ -31,7 +32,7 @@ def extract_all_certs():
+     return certs
+ 
+ 
+-def load_certs_into_context(certs):
++def load_certs_into_context(certs: dict[str, str]) -> ssl.SSLContext:
+     ctx = ssl.create_default_context()
+     for key in certs:
+         try:
+@@ -42,7 +43,7 @@ def load_certs_into_context(certs):
+     return ctx
+ 
+ 
+-def init_custom_certificates():
++def init_custom_certificates() -> dict[str, str]:
+     global custom_ca_certs
+     global ctx
+     logger.info("Initializing custom certificates")
+diff --git a/app/common/tracing.py b/app/common/tracing.py
+index f3791e2..7b0b773 100644
+--- a/app/common/tracing.py
++++ b/app/common/tracing.py
+@@ -1,16 +1,20 @@
+ import contextvars
++from collections.abc import Awaitable, Callable
+ from logging import getLogger
++from typing import Any
+ 
+-from fastapi import Request
++from fastapi import Request, Response
+ from starlette.middleware.base import BaseHTTPMiddleware
+ 
+ from app.config import config
+ 
+ logger = getLogger(__name__)
+ 
+-ctx_trace_id = contextvars.ContextVar("trace_id")
+-ctx_request = contextvars.ContextVar("request")
+-ctx_response = contextvars.ContextVar("response")
++ctx_trace_id: contextvars.ContextVar[str] = contextvars.ContextVar("trace_id")
++ctx_request: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar("request")
++ctx_response: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
++    "response"
++)
+ 
+ 
+ # Inbound HTTP requests on the platform will have a `x-cdp-request-id` header.
+@@ -18,7 +22,9 @@ ctx_response = contextvars.ContextVar("response")
+ # TraceIdMiddleware handles extracting the tracing header and persisting it
+ # for the duration of the request in the ContextVar `ctx_trace_id`.
+ class TraceIdMiddleware(BaseHTTPMiddleware):
+-    async def dispatch(self, request: Request, call_next):
++    async def dispatch(
++        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
++    ) -> Response:
+         req_trace_id = request.headers.get(config.tracing_header, None)
+         if req_trace_id:
+             ctx_trace_id.set(req_trace_id)
+diff --git a/app/main.py b/app/entrypoints/fastapi.py
+similarity index 88%
+rename from app/main.py
+rename to app/entrypoints/fastapi.py
+index 53cef53..9b58eda 100644
+--- a/app/main.py
++++ b/app/entrypoints/fastapi.py
+@@ -1,3 +1,4 @@
++from collections.abc import AsyncGenerator
+ from contextlib import asynccontextmanager
+ from logging import getLogger
+ 
+@@ -14,7 +15,7 @@ logger = getLogger(__name__)
+ 
+ 
+ @asynccontextmanager
+-async def lifespan(_: FastAPI):
++async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
+     # Startup
+     client = await get_mongo_client()
+     logger.info("MongoDB client connected")
+@@ -37,7 +38,7 @@ app.include_router(example_router)
+ 
+ def main() -> None:  # pragma: no cover
+     uvicorn.run(
+-        "app.main:app",
++        "app.entrypoints.fastapi:app",
+         host=config.host,
+         port=config.port,
+         log_config=config.log_config,
+diff --git a/app/example/__init__.py b/app/example/__init__.py
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/app/example/router.py b/app/example/router.py
+index 46ae672..32cc55c 100644
+--- a/app/example/router.py
++++ b/app/example/router.py
+@@ -1,33 +1,6 @@
+ from logging import getLogger
+ 
+-from fastapi import APIRouter, Depends
++from fastapi import APIRouter
+ 
+-from app.common.http_client import create_async_client
+-from app.common.mongo import get_db
+-from app.config import config
+-
+-router = APIRouter(prefix="/example")
++router = APIRouter()
+ logger = getLogger(__name__)
+-
+-
+-# basic endpoint example
+-@router.get("/test")
+-async def root():
+-    logger.info("TEST ENDPOINT")
+-    return {"ok": True}
+-
+-
+-# database endpoint example
+-@router.get("/db")
+-async def db_query(db=Depends(get_db)):
+-    await db.example.insert_one({"foo": "bar"})
+-    data = await db.example.find_one({}, {"_id": 0})
+-    return {"ok": data}
+-
+-
+-# http client endpoint example
+-@router.get("/http")
+-async def http_query(client=Depends(create_async_client)):
+-    endpoint = config.aws_endpoint_url or "http://localstack:4566"
+-    resp = await client.get(f"{endpoint}/health")
+-    return {"ok": resp.status_code}
+diff --git a/app/example/test_router.py b/app/example/test_router.py
+deleted file mode 100644
+index 9ee931f..0000000
+--- a/app/example/test_router.py
++++ /dev/null
+@@ -1,46 +0,0 @@
+-from fastapi.testclient import TestClient
+-
+-from app.common.http_client import create_async_client
+-from app.common.mongo import get_db
+-from app.main import app
+-
+-client = TestClient(app)
+-
+-
+-def test_root_success():
+-    response = client.get("/example/test")
+-    assert response.status_code == 200
+-    assert response.json() == {"ok": True}
+-
+-
+-def test_db_query_success(mocker):
+-    mock_db = mocker.AsyncMock()
+-    mock_db.example.insert_one.return_value = None
+-    mock_db.example.find_one.return_value = {"foo": "bar", "id": 123}
+-
+-    app.dependency_overrides[get_db] = lambda: mock_db
+-
+-    try:
+-        response = client.get("/example/db")
+-
+-        assert response.status_code == 200
+-        assert response.json() == {"ok": {"foo": "bar", "id": 123}}
+-
+-        mock_db.example.insert_one.assert_called_once()
+-    finally:
+-        app.dependency_overrides = {}
+-
+-
+-def test_http_query_success(mocker):
+-    mock_client = mocker.AsyncMock()
+-    mock_client.get.return_value.status_code = 200
+-
+-    app.dependency_overrides[create_async_client] = lambda: mock_client
+-
+-    try:
+-        response = client.get("/example/http")
+-
+-        assert response.status_code == 200
+-        assert response.json() == {"ok": 200}
+-    finally:
+-        app.dependency_overrides = {}
+diff --git a/app/health/__init__.py b/app/health/__init__.py
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/app/health/router.py b/app/health/router.py
+index c541e5c..dfc7f27 100644
+--- a/app/health/router.py
++++ b/app/health/router.py
+@@ -5,5 +5,5 @@ router = APIRouter()
+ 
+ # Do not remove - used for health checks
+ @router.get("/health")
+-async def health():
++async def health() -> dict[str, str]:
+     return {"status": "ok"}
+diff --git a/docs/ai/ai-guidelines-python.md b/docs/ai/ai-guidelines-python.md
+new file mode 100644
+index 0000000..892d98f
+--- /dev/null
++++ b/docs/ai/ai-guidelines-python.md
+@@ -0,0 +1,187 @@
++# AI Coding Guidelines (Python)
++
++These rules apply to all AI-assisted Python development in this repository.
++
++The AI assistant MUST follow these guidelines when generating or modifying Python code, tests, or tooling.
++
++---
++
++## 1. Packaging, Tasks & Dependency Management
++
++- The Python package manager is **`uv`**.
++- All Python commands MUST be executed via `uv`.
++- Operational commands (tests, lint, formatting, etc.) MUST be run via **`taskipy`** tasks configured in `pyproject.toml`.
++
++### 1.1 Command patterns
++
++The assistant MUST:
++
++- Use `uv run task <name>` for project tasks such as testing and linting.
++- Prefer existing tasks over invoking tools directly.
++
++Examples:
++
++- Run tests:
++  - `uv run task test`
++- Run lint + format:
++  - `uv run task lint`
++
++Only when there is **no appropriate task** defined in `pyproject.toml` is it acceptable to suggest a direct tool invocation like:
++
++- `uv run pytest`
++- `uv run ruff check .`
++- `uv run ruff format .`
++
++The assistant MUST:
++
++- Avoid suggesting `pip`, `virtualenv`, `conda`, `poetry`, or `pipenv` unless explicitly requested.
++- Avoid suggesting raw `python` / `pytest` / `ruff` commands without `uv run`.
++
++When proposing **new recurring workflows** (e.g. a type-checking step), the assistant SHOULD:
++
++- Suggest adding a new `taskipy` task in `pyproject.toml`, e.g.:
++
++  ```toml
++  [tool.taskipy.tasks]
++  typecheck = "mypy src"
++  ```
++
++- Then run it via `uv run task typecheck`.
++
++---
++
++## 2. Testing
++
++### 2.1 General
++
++- The organisation requires **> 90% unit test coverage**.
++- Every non-trivial change SHOULD include or update tests.
++- New modules and public functions SHOULD have corresponding tests.
++
++The assistant SHOULD:
++
++- Propose tests along with implementation.
++- Update existing tests when behavior changes.
++- Highlight visible coverage gaps when appropriate.
++
++### 2.2 Test Framework
++
++- **Testing framework:** `pytest`.
++- Do **NOT** use the `unittest` framework or subclass `unittest.TestCase`.
++
++The assistant MUST:
++
++- Write pytest-style tests:
++  - Test files named like `test_*.py` or `*_test.py`.
++  - Tests as **functions**, not classes.
++- Prefer **function-based tests** over class-based tests.
++
++### 2.3 Pytest Idioms & Fixtures
++
++The assistant SHOULD use standard pytest features and idioms:
++
++- Built-in fixtures:
++  - `tmp_path` for temporary filesystem interactions.
++  - `monkeypatch` for modifying environment/attributes.
++- The `mocker` fixture (if `pytest-mock` is available in this project) for mocking.
++
++The assistant MUST:
++
++- Prefer pytest fixtures and idioms over custom temp-dir or mocking code.
++- Prefer `mocker.patch` over `unittest.mock.patch`.
++
++Tests SHOULD be runnable via:
++
++- `uv run task test`
++
++---
++
++## 3. Style, Linting & Comments
++
++### 3.1 Style & Linting
++
++- Follow **PEP 8** and idiomatic Python style.
++- Use **`ruff`** as the single source of truth for linting and formatting rules.
++
++The assistant MUST:
++
++- Generate code expected to pass `ruff`.
++- Prefer clarity over cleverness.
++
++Linting/formatting SHOULD be run via:
++
++- `uv run task lint`
++
++Only if no lint task exists, use:
++
++- `uv run ruff check .`
++- `uv run ruff format .`
++
++### 3.2 Imports & Structure
++
++- Use absolute imports unless the repo clearly prefers relative ones.
++- Import order:
++  1. Standard library
++  2. Third-party
++  3. Internal modules
++
++### 3.3 Commenting Guidelines
++
++Comments MUST be minimal.
++
++The assistant SHOULD:
++
++- Avoid adding comments that merely restate what the code already expresses.
++- Prefer **clear naming**, **small focused functions**, and **readable logic** instead of verbose explanations.
++- Add comments **only when absolutely necessary** to aid understanding:
++  - non-obvious decisions  
++  - subtle edge cases  
++  - justification for unusual patterns  
++
++Comments SHOULD explain **why**, not **what**.
++
++---
++
++## 4. Behaviour When Modifying Code
++
++When modifying or adding code, the assistant SHOULD:
++
++1. **Match existing patterns** in nearby modules.
++2. Keep functions small, explicit, and readable.
++3. Preserve public APIs unless instructed otherwise.
++4. Add or update tests in the appropriate test module.
++5. Recommend running:
++   - `uv run task test`
++   - `uv run task lint`
++
++---
++
++## 5. Forbidden / Strongly Discouraged Practices
++
++The assistant MUST NOT:
++
++- Introduce alternate package managers or dependency systems.
++- Use `unittest` or `unittest.TestCase`.
++- Suggest disabling `ruff` or adding broad `# noqa` comments.
++- Introduce new third-party dependencies unless explicitly instructed.
++- Suggest running raw `pytest` or `ruff` without using `uv` and `taskipy` where applicable.
++
++The assistant SHOULD avoid:
++
++- Large refactors without tests.
++- Over-engineering or unnecessary abstractions.
++
++---
++
++## 6. Self-checklist for AI-generated Python Changes
++
++Before finalising, the assistant SHOULD verify:
++
++- [ ] All suggested commands use `uv` and `taskipy` when applicable.
++- [ ] Tests use pytest, function-based, no unittest.
++- [ ] Pytest fixtures used appropriately (`mocker`, `tmp_path`, `monkeypatch`, etc.).
++- [ ] Code is expected to pass `ruff` checks.
++- [ ] No new dependencies added without instruction.
++- [ ] Public APIs preserved unless explicitly changed.
++- [ ] Tests added or updated for new or changed behaviour.
++
+diff --git a/docs/ai/project-context.md b/docs/ai/project-context.md
+new file mode 100644
+index 0000000..11d70fb
+--- /dev/null
++++ b/docs/ai/project-context.md
+@@ -0,0 +1,29 @@
++# Project Context for AI Agents
++
++## Purpose of the System
++
++The `ai-uc-rag-evaluation-runtime` is a Python-based backend service that is an example implementation of RAG system. The service is built using the FastAPI framework.
++
++## Architecture Overview
++
++- `app/...` – Main application logic (FastAPI, LangChain/LangGraph agents).
++  - `app/entrypoints/...` – Application entry points (e.g., `fastapi.py`).
++  - `app/common/...` – Shared utilities (logging, metrics, HTTP client).
++- `tests/...` – Comprehensive pytest suite (unit and integration tests).
++- `scripts/...` – Command-line utilities and helper scripts (e.g., security checks).
++- `docs/...` – Documentation including AI guidelines and system prompts.
++
++## Key Constraints
++
++- **Dependency Management**: All execution uses `uv` for dependency management and virtual environment handling.
++- **Task Management**: All common development tasks (linting, testing) use `taskipy` as defined in `pyproject.toml`.
++- **Code Quality**: All code must pass `ruff` for linting and formatting.
++- **Testing**: All tests must use `pytest` function-style patterns.
++- **Python Version**: The project requires Python >= 3.12.
++
++## Example Files to Reference
++
++- `app/entrypoints/fastapi.py` – Main application entry point.
++- `tests/entrypoints/test_fastapi.py` – Example of a pytest test file.
++- `pyproject.toml` – Project configuration and dependencies.
++
+diff --git a/pyproject.toml b/pyproject.toml
+index 3f0133f..6a5dd82 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -1,6 +1,6 @@
+ [project]
+-name = "ai-uc-content-swarm-runtime"
+-description = "ai-uc-content-swarm-runtime"
++name = "ai-uc-rag-evaluation-runtime"
++description = "ai-uc-rag-evaluation-runtime"
+ version = "0.1.0"
+ readme = "README.md"
+ requires-python = ">=3.12"
+@@ -29,7 +29,7 @@ dev = [
+ ]
+ 
+ [project.scripts]
+-ai-uc-content-swarm-runtime = "app.main:main"
++ai-uc-rag-evaluation-runtime = "app.entrypoints.fastapi:main"
+ 
+ [build-system]
+ requires = ["hatchling"]
+@@ -41,7 +41,7 @@ packages = ["app"]
+ [tool.coverage.run]
+ branch = true
+ include = ["app/*"]
+-omit = ["tests/*"]
++omit = ["tests/*", "*/test_*"]
+ 
+ [tool.coverage.html]
+ directory = "coverage/coverage_html"
+@@ -55,10 +55,11 @@ lint = "uv run ruff format ./app ./tests --check && uv run ruff check ./app ./t
+ typecheck = "uv run mypy ./app ./tests"
+ test = "uv run task lint && uv run task typecheck && uv run coverage run -m pytest -vv && uv run coverage html && uv run coverage xml"
+ 
++[tool.pytest.ini_options]
++minversion = "7.0"
++testpaths = ["tests"]
++asyncio_mode = "auto"
+ 
+-[tool.pytest]
+-minversion = "7.0"
+-testpaths = ["app", "tests"]
+ asyncio_mode = "auto"
+ 
+ [tool.mypy]
+@@ -77,3 +78,9 @@ ignore_missing_imports = true
+ [[tool.mypy.overrides]]
+ module = "boto3.*"
+ ignore_missing_imports = true
++
++[tool.ruff]
++# This should come from .ruff.toml
++
++[tool.ruff.lint]
++# This should come from .ruff.toml
+diff --git a/scripts/check-unpinned-dependencies.sh b/scripts/check-unpinned-dependencies.sh
+new file mode 100755
+index 0000000..5a66a87
+--- /dev/null
++++ b/scripts/check-unpinned-dependencies.sh
+@@ -0,0 +1,24 @@
++#!/bin/bash
++
++# Check if pyproject.toml exists
++if [ ! -f "pyproject.toml" ]; then
++    echo "pyproject.toml not found!"
++    exit 1
++fi
++
++# Extract dependencies from pyproject.toml and check for unpinned versions
++unpinned_deps=$(grep -A 50 "^dependencies = \[" pyproject.toml | grep -E '^\s*"' | grep -v '==' | grep -v '>=' | grep -v '<=' | grep -v '~=' | grep -v '!=' | grep -v '>' | grep -v '<' | head -20)
++
++if [ -n "$unpinned_deps" ]; then
++    echo "⚠️  WARNING: Found potentially unpinned dependencies:"
++    echo "$unpinned_deps"
++    echo
++    echo "Consider pinning these dependencies to specific versions for better reproducibility."
++    echo "Example: 'package==1.2.3' instead of 'package'"
++    echo
++    echo "This is a warning only - the build will continue."
++else
++    echo "✅ All main dependencies appear to be pinned to specific versions."
++fi
++
++echo "✅ Dependency check completed."
+diff --git a/sonar-project.properties b/sonar-project.properties
+index 6d7b4a3..c5b7d56 100644
+--- a/sonar-project.properties
++++ b/sonar-project.properties
+@@ -1,4 +1,4 @@
+-sonar.projectKey=DEFRA_ai-uc-content-swarm-runtime
++sonar.projectKey=DEFRA_ai-uc-rag-evaluation-runtime
+ sonar.organization=defra
+ 
+ # This is the name and version displayed in the SonarCloud UI.
+diff --git a/app/common/test_http_client.py b/tests/common/test_http_client.py
+similarity index 96%
+rename from app/common/test_http_client.py
+rename to tests/common/test_http_client.py
+index 6e6e50d..28c5f69 100644
+--- a/app/common/test_http_client.py
++++ b/tests/common/test_http_client.py
+@@ -8,7 +8,7 @@ from app.config import config
+ def test_trace_id_missing():
+     with patch("app.common.http_client.ctx_trace_id") as mock_ctx:
+         mock_ctx.get.return_value = None
+-        request = Mock()
++        request = Mock(spec=httpx.Request)
+         request.headers = {}
+ 
+         hook_request_tracing(request)
+@@ -20,7 +20,7 @@ def test_trace_id_set():
+     trace_id = "test-trace-123"
+     with patch("app.common.http_client.ctx_trace_id") as mock_ctx:
+         mock_ctx.get.return_value = trace_id
+-        request = Mock()
++        request = Mock(spec=httpx.Request)
+         request.headers = {}
+ 
+         hook_request_tracing(request)
+diff --git a/app/common/test_log_utils.py b/tests/common/test_log_utils.py
+similarity index 100%
+rename from app/common/test_log_utils.py
+rename to tests/common/test_log_utils.py
+diff --git a/app/common/test_metrics.py b/tests/common/test_metrics.py
+similarity index 100%
+rename from app/common/test_metrics.py
+rename to tests/common/test_metrics.py
+diff --git a/app/common/test_mongo.py b/tests/common/test_mongo.py
+similarity index 100%
+rename from app/common/test_mongo.py
+rename to tests/common/test_mongo.py
+diff --git a/app/common/test_tls.py b/tests/common/test_tls.py
+similarity index 100%
+rename from app/common/test_tls.py
+rename to tests/common/test_tls.py
+diff --git a/tests/entrypoints/test_fastapi.py b/tests/entrypoints/test_fastapi.py
+new file mode 100644
+index 0000000..f5a37b7
+--- /dev/null
++++ b/tests/entrypoints/test_fastapi.py
+@@ -0,0 +1,21 @@
++from unittest.mock import AsyncMock
++
++import pytest
++from fastapi import FastAPI
++from fastapi.testclient import TestClient
++
++from app.entrypoints.fastapi import app, lifespan
++
++client = TestClient(app)
++
++
++@pytest.mark.asyncio
++async def test_lifespan():
++    mock_app = AsyncMock(spec=FastAPI)
++    mock_client = AsyncMock()
++
++    with pytest.MonkeyPatch().context() as m:
++        m.setattr("app.entrypoints.fastapi.get_mongo_client", lambda: mock_client)
++        async with lifespan(mock_app):
++            pass
++        mock_client.close.assert_called_once()
+@@ -0,0 +1,21 @@
++from unittest.mock import AsyncMock
++
++import pytest
++from fastapi import FastAPI
++from fastapi.testclient import TestClient
++
++from app.entrypoints.fastapi import app, lifespan
++
++client = TestClient(app)
++
++
++@pytest.mark.asyncio
++async def test_lifespan():
++    mock_app = AsyncMock(spec=FastAPI)
++    mock_client = AsyncMock()
++
++    with pytest.MonkeyPatch().context() as m:
++        m.setattr("app.entrypoints.fastapi.get_mongo_client", lambda: mock_client)
++        async with lifespan(mock_app):
++            pass
++        mock_client.close.assert_called_once()
++
++
++def test_health():
++    response = client.get("/health")
++    assert response.status_code == 200
++    assert response.json() == {"status": "ok"}
++
++
++def test_root():
++    response = client.get("/")
++    assert response.status_code == 404
+diff --git a/app/test_main.py b/app/test_main.py
+deleted file mode 100644
+index 39b0532..0000000
+--- a/app/test_main.py
++++ /dev/null
+@@ -1,21 +0,0 @@
+-from unittest.mock import AsyncMock
+-
+-import pytest
+-from fastapi import FastAPI
+-from fastapi.testclient import TestClient
+-
+-from app.main import app, lifespan
+-
+-client = TestClient(app)
+-
+-
+-@pytest.mark.asyncio
+-async def test_lifespan():
+-    mock_app = AsyncMock(spec=FastAPI)
+-    mock_client = AsyncMock()
+-
+-    with pytest.MonkeyPatch().context() as m:
+-        m.setattr("app.main.get_mongo_client", lambda: mock_client)
+-        async with lifespan(mock_app):
+-            pass
+-        mock_client.close.assert_called_once()
+diff --git a/uv.lock b/uv.lock
+index 90fe91a..31d87eb 100644
+--- a/uv.lock
++++ b/uv.lock
+@@ -2,8 +2,8 @@ version = 1
+ requires-python = ">=3.12"
+ 
+ [[package]]
+-name = "ai-uc-content-swarm-runtime"
+-version = "0.1.0"
++name = "ai-uc-rag-evaluation-runtime"
++version = "0.1.0"
+ source = { editable = "." }
+ dependencies = [
+     "asgi-logger",
