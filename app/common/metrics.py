@@ -13,8 +13,13 @@ logger = getLogger(__name__)
 # More time needs to be spent on this, but for now, the metrics are being sent to cloudwatch
 # Setting metrics to Any as have no idea what this should be.
 @metric_scope
-def __put_metric(metric_name: str, value: float, unit: str, metrics: Any) -> None:
+def __put_metric(
+    metric_name: str, value: float, unit: str, metrics: Any | None = None
+) -> None:
     logger.debug("put metric: %s - %s - %s", metric_name, value, unit)
+    if metrics is None:
+        logger.error("No metrics context available for put_metric")
+        return
     metrics.put_metric(metric_name, value, unit, StorageResolution.STANDARD)
 
 
