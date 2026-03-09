@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import app.common.http_client as http_client
 import app.config as config
 from app.evaluation.exceptions import (
@@ -8,7 +10,7 @@ from app.evaluation.exceptions import (
 
 async def query_snapshot(
     group_id: str, query: str, max_results: int
-) -> tuple[int, list[dict]]:
+) -> list[dict[str, Any]]:
     if not config.config.evaluation_data_service_url:
         raise EvaluationDataServiceNotConfiguredError()
 
@@ -36,4 +38,11 @@ async def query_snapshot(
             status_code=response.status_code, detail=detail
         )
 
-    return response.json()
+    payload = response.json()
+    if not isinstance(payload, list):
+        raise EvaluationDataServiceError(
+            status_code=response.status_code,
+            detail="Expected snapshots response to be a list",
+        )
+
+    return cast(list[dict[str, Any]], payload)

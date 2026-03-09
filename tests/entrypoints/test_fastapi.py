@@ -32,7 +32,7 @@ def test_root() -> None:
 
 def test_trigger_rag_evaluation_not_configured(mocker: MockerFixture) -> None:
     mocker.patch(
-        "app.evaluation.service.config.config.evaluation_data_service_url",
+        "app.evaluation.rag_service.config.config.evaluation_data_service_url",
         None,
     )
     response = client.get(
@@ -45,7 +45,7 @@ def test_trigger_rag_evaluation_not_configured(mocker: MockerFixture) -> None:
 
 def test_trigger_rag_evaluation_success(mocker: MockerFixture) -> None:
     mocker.patch(
-        "app.evaluation.service.config.config.evaluation_data_service_url",
+        "app.evaluation.rag_service.config.config.evaluation_data_service_url",
         "http://data-service.example/",
     )
     mock_response = mocker.MagicMock()
@@ -61,7 +61,7 @@ def test_trigger_rag_evaluation_success(mocker: MockerFixture) -> None:
     mock_client.__aexit__ = mocker.AsyncMock(return_value=None)
 
     mocker.patch(
-        "app.evaluation.service.http_client.create_async_client",
+        "app.evaluation.rag_service.http_client.create_async_client",
         return_value=mock_client,
     )
 
@@ -83,7 +83,7 @@ def test_trigger_rag_evaluation_success(mocker: MockerFixture) -> None:
 
 def test_trigger_rag_evaluation_upstream_error(mocker: MockerFixture) -> None:
     mocker.patch(
-        "app.evaluation.service.config.config.evaluation_data_service_url",
+        "app.evaluation.rag_service.config.config.evaluation_data_service_url",
         "http://data-service.example/",
     )
     mock_response = mocker.MagicMock()
@@ -100,7 +100,7 @@ def test_trigger_rag_evaluation_upstream_error(mocker: MockerFixture) -> None:
     mock_client.__aexit__ = mocker.AsyncMock(return_value=None)
 
     mocker.patch(
-        "app.evaluation.service.http_client.create_async_client",
+        "app.evaluation.rag_service.http_client.create_async_client",
         return_value=mock_client,
     )
 

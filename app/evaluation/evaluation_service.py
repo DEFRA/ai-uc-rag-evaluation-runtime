@@ -1,9 +1,9 @@
-from pprint import pp
+from typing import Any
 
 from pydantic_evals import Case, Dataset
 from pydantic_evals.evaluators import LLMJudge
 
-settings = {}
+settings: dict[str, Any] = {}
 settings["n_prompts"] = 10
 settings["region"] = "eu-west-2"
 settings["temperature"] = 0
@@ -17,16 +17,17 @@ Return a score between 0 and 1 reflecting the likelihood that the answer is a ha
 """
 
 _judge = LLMJudge(
-        model=f"bedrock:{settings['model_id']}",
-        rubric=settings["rubric"],
-        score={"evaluation_name": "HallucinationScore"},
-        model_settings={
-            "temperature": settings["temperature"],
-            "max_tokens": 2048,
-        },
-        include_input=True,
-        include_expected_output=True,
-    )
+    model=f"bedrock:{settings['model_id']}",
+    rubric=settings["rubric"],
+    score={"evaluation_name": "HallucinationScore"},
+    model_settings={
+        "temperature": settings["temperature"],
+        "max_tokens": 2048,
+    },
+    include_input=True,
+    include_expected_output=True,
+)
+
 
 async def evaluate_pydantic(
     knowledge: str, question: str, answer: str, settings: dict
@@ -50,7 +51,7 @@ async def evaluate_pydantic(
 
     score_entry = case_result.scores.get("HallucinationScore")
 
-    score = score_entry.value
+    score = score_entry.value if score_entry else None
     reason = case_result.assertions.get("LLMJudge_pass")
     return {
         "method": "Pydantic",
