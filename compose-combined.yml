@@ -1,0 +1,228 @@
+# Combined stack: one localstack, one mongodb, both evaluation-data and evaluation-runtime.
+# Run from ai-uc-rag-evaluation-runtime with sibling ai-uc-rag-evaluation-data:
+#   docker compose -f compose-combined.yml --profile service up -d
+# Or from a parent directory containing both repos, override project directory:
+#   docker compose -f ai-uc-rag-evaluation-runtime/compose-combined.yml -p rag-evaluation --profile service up -d
+
+services:
+  localstack:
+    image: localstack/localstack:4.9.2
+    ports:
+      - "4566:4566"
+      - "4510-4559:4510-4559"
+    env_file:
+      - "compose/aws.env"
+    environment:
+      DEBUG: ${DEBUG:-1}
+      LS_LOG: WARN
+      SERVICES: s3,sqs,sns,firehose
+      LOCALSTACK_HOST: 127.0.0.1
+    volumes:
+      - "${TMPDIR:-/tmp}/localstack:/var/lib/localstack"
+      - ../ai-uc-rag-evaluation-data/compose/start-localstack.sh:/etc/localstack/init/ready.d/start-localstack.sh
+    healthcheck:
+      test: ["CMD", "curl", "localhost:4566"]
+      interval: 5s
+      start_period: 5s
+      retries: 3
+    networks:
+      - cdp-tenant
+
+  mongodb:
+    image: mongo:6.0.13
+    networks:
+      - cdp-tenant
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data
+    restart: always
+
+  postgres:
+    build:
+      context: ../ai-uc-rag-evaluation-data
+      dockerfile: pgvector.Dockerfile
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      start_period: 5s
+      retries: 3
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    env_file:
+      - ../ai-uc-rag-evaluation-data/compose/postgres.env
+    networks:
+      - cdp-tenant
+
+  migrator:
+    build:
+      context: ../ai-uc-rag-evaluation-data/migrator
+    image: migrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ../ai-uc-rag-evaluation-data/compose/postgres.env
+    volumes:
+      - ../ai-uc-rag-evaluation-data/changelog:/liquibase/changelog
+    networks:
+      - cdp-tenant
+
+  redis:
+    image: redis:7.2.3-alpine3.18
+    ports:
+      - "6379:6379"
+    restart: always
+    networks:
+      - cdp-tenant
+
+  cdp-uploader:
+    image: defradigital/cdp-uploader:${CDP_UPLOADER_VERSION:-latest}
+    ports:
+      - "7337:7337"
+    links:
+      - "localstack:localstack"
+      - "redis:redis"
+    depends_on:
+      localstack:
+        condition: service_healthy
+    env_file:
+      - compose/aws.env
+    environment:
+      VIRTUAL_HOST: ~^uploader\..*\.sslip\.io
+      VIRTUAL_PATH: /
+      VIRTUAL_PORT: 7337
+      PORT: 7337
+      NODE_ENV: development
+      REDIS_HOST: redis
+      USE_SINGLE_INSTANCE_CACHE: true
+      MOCK_VIRUS_SCAN_ENABLED: true
+      MOCK_VIRUS_RESULT_DELAY: 3
+      SQS_ENDPOINT: http://localstack:4566
+      S3_ENDPOINT: http://localstack:4566
+    networks:
+      - cdp-tenant
+
+  evaluation-data:
+    build:
+      context: ../ai-uc-rag-evaluation-data
+      target: development
+    ports:
+      - "8085:8085"
+      - "5678:5678"
+    links:
+      - "localstack:localstack"
+      - "mongodb:mongodb"
+    depends_on:
+      localstack:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+    profiles:
+      - service
+    env_file:
+      - ../ai-uc-rag-evaluation-data/compose/aws.env
+      - ../ai-uc-rag-evaluation-data/compose/postgres.env
+      - ../ai-uc-rag-evaluation-data/compose/app.env
+      - ../ai-uc-rag-evaluation-data/compose/secrets.env
+    environment:
+      PORT: ${PORT:-8085}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017/}
+      HOST: ${HOST:-0.0.0.0}
+      LOCALSTACK_URL: ${LOCALSTACK_URL:-http://localstack:4566}
+    volumes:
+      - ../ai-uc-rag-evaluation-data/app:/home/nonroot/app
+    develop:
+      watch:
+        - action: sync
+          path: ../ai-uc-rag-evaluation-data/app
+          target: /home/nonroot/app
+          ignore:
+            - README.md
+            - "**/*.md"
+            - "**/test_*.py"
+            - tests/**/*
+            - .git/**/*
+            - .venv/**/*
+            - .pytest_cache/**/*
+            - .ruff_cache/**/*
+            - .vscode/**/*
+            - .github/**/*
+            - requirements-dev.txt
+            - pytest.ini
+            - .pre-commit-config.yaml
+            - sonar-project.properties
+            - LICENCE
+        - action: rebuild
+          path: ../ai-uc-rag-evaluation-data/pyproject.toml
+          target: /home/nonroot/pyproject.toml
+    networks:
+      - cdp-tenant
+
+  evaluation-runtime:
+    build:
+      context: .
+      target: development
+    ports:
+      - "9085:8085"
+    links:
+      - "localstack:localstack"
+      - "mongodb:mongodb"
+    depends_on:
+      localstack:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      evaluation-data:
+        condition: service_started
+    profiles:
+      - service
+    env_file:
+      - compose/aws.env
+      - compose/secrets.env
+    environment:
+      PORT: ${PORT:-8085}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://localstack:4566}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017/}
+      HOST: ${HOST:-0.0.0.0}
+      EVALUATION_DATA_SERVICE_URL: ${EVALUATION_DATA_SERVICE_URL:-http://evaluation-data:8085}
+    develop:
+      watch:
+        - action: sync
+          path: ./app
+          target: /home/nonroot/app
+          ignore:
+            - README.md
+            - "**/*.md"
+            - "**/test_*.py"
+            - tests/**/*
+            - .git/**/*
+            - .venv/**/*
+            - .pytest_cache/**/*
+            - .ruff_cache/**/*
+            - .vscode/**/*
+            - .github/**/*
+            - requirements-dev.txt
+            - pytest.ini
+            - .pre-commit-config.yaml
+            - sonar-project.properties
+            - LICENCE
+        - action: rebuild
+          path: ./pyproject.toml
+          target: /home/nonroot/pyproject.toml
+    networks:
+      - cdp-tenant
+
+volumes:
+  mongodb-data:
+  postgres-data:
+
+networks:
+  cdp-tenant:
+    driver: bridge
