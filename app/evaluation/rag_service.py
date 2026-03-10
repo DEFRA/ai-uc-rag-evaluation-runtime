@@ -1,3 +1,4 @@
+from logging import getLogger
 from typing import Any, cast
 
 import app.common.http_client as http_client
@@ -6,6 +7,8 @@ from app.evaluation.exceptions import (
     EvaluationDataServiceError,
     EvaluationDataServiceNotConfiguredError,
 )
+
+logger = getLogger(__name__)
 
 
 async def query_snapshot(
@@ -34,6 +37,9 @@ async def query_snapshot(
             )
         except Exception:
             detail = response.text or "Unknown error"
+        logger.error(
+            "Error when contacting rag service %s %s", response.status_code, detail
+        )
         raise EvaluationDataServiceError(
             status_code=response.status_code, detail=detail
         )
