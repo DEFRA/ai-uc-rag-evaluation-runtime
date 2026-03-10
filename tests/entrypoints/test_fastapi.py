@@ -64,6 +64,17 @@ def test_trigger_rag_evaluation_success(mocker: MockerFixture) -> None:
         "app.evaluation.rag_service.http_client.create_async_client",
         return_value=mock_client,
     )
+    mocker.patch(
+        "app.evaluation.router.evaluation_service.evaluate_pydantic",
+        new=mocker.AsyncMock(
+            return_value={
+                "method": "Pydantic",
+                "score": 0.91,
+                "reason": "match",
+                "passed": True,
+            }
+        ),
+    )
 
     response = client.get(
         "/evaluation/rag",
@@ -71,7 +82,14 @@ def test_trigger_rag_evaluation_success(mocker: MockerFixture) -> None:
     )
 
     assert response.status_code == 200
-    assert response.json() == [{"content": "doc1", "similarityScore": 0.9}]
+    assert response.json() == [
+        {
+            "method": "Pydantic",
+            "score": 0.91,
+            "reason": "match",
+            "passed": True,
+        }
+    ]
     mock_client.post.assert_called_once()
     call_kwargs = mock_client.post.call_args[1]
     assert call_kwargs["json"] == {

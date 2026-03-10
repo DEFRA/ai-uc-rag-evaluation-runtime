@@ -1,5 +1,13 @@
-from pydantic import HttpUrl
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import HttpUrl, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsConfigDict
+
+
+class LlmAsAJudgeConfig(BaseSettings):
+    model_config = SettingsConfigDict()
+    model_id: str = Field(..., alias="LLM_AS_A_JUDGE_MODEL_ID")
+    temperature: float = Field(0, alias="LLM_AS_A_JUDGE_TEMPERATURE")
+    threshold: float = Field(0.5, alias="LLM_AS_A_JUDGE_THRESHOLD")
+    n_prompts: int = Field(10, alias="LLM_AS_A_JUDGE_N_PROMPTS")
 
 
 class AppConfig(BaseSettings):
@@ -16,6 +24,6 @@ class AppConfig(BaseSettings):
     enable_metrics: bool = False
     tracing_header: str = "x-cdp-request-id"
     evaluation_data_service_url: HttpUrl | None = None
-
+    llm_as_a_judge_config: LlmAsAJudgeConfig = LlmAsAJudgeConfig()
 
 config = AppConfig()

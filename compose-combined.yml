@@ -188,7 +188,7 @@ services:
       - compose/secrets.env
     environment:
       PORT: ${PORT:-8085}
-      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://localstack:4566}
+      LOCALSTACK_URL: ${LOCALSTACK_URL:-http://localstack:4566}
       MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017/}
       HOST: ${HOST:-0.0.0.0}
       EVALUATION_DATA_SERVICE_URL: ${EVALUATION_DATA_SERVICE_URL:-http://evaluation-data:8085}
