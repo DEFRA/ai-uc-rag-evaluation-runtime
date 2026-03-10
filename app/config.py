@@ -1,5 +1,5 @@
-from pydantic import HttpUrl, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsConfigDict
+from pydantic import Field, HttpUrl
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class LlmAsAJudgeConfig(BaseSettings):
@@ -24,6 +24,9 @@ class AppConfig(BaseSettings):
     enable_metrics: bool = False
     tracing_header: str = "x-cdp-request-id"
     evaluation_data_service_url: HttpUrl | None = None
-    llm_as_a_judge_config: LlmAsAJudgeConfig = LlmAsAJudgeConfig()
+    llm_as_a_judge_config: LlmAsAJudgeConfig = Field(
+        default_factory=lambda: LlmAsAJudgeConfig()
+    )
+
 
 config = AppConfig()

@@ -1,12 +1,8 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 import app.evaluation.evaluation_service as evaluation_service
 import app.evaluation.rag_service as rag_service
-from app.evaluation.exceptions import (
-    EvaluationDataServiceError,
-    EvaluationDataServiceNotConfiguredError,
-)
 
 router = APIRouter(tags=["evaluation"])
 
@@ -25,9 +21,8 @@ async def trigger_rag_evaluation(
 
     evaluated_content = []
     for item in content:
-        answer = item.get("content")
+        answer = str(item.get("content"))
         evaluation = await evaluation_service.evaluate_pydantic(
-            "",
             query,
             expected_answer,
             answer,

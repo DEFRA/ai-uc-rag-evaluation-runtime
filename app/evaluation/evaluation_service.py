@@ -1,7 +1,7 @@
 import pydantic_evals
 import pydantic_evals.evaluators
-import app.config as config
 
+import app.config as config
 
 rubric = """
 You are an agent to determine the correctness of the answer privided compared to the expected answer.
@@ -23,7 +23,7 @@ _judge = pydantic_evals.evaluators.LLMJudge(
 
 
 async def evaluate_pydantic(
-    knowledge: str, question: str, expected_answer: str, actual_answer: str
+    question: str, expected_answer: str, actual_answer: str
 ) -> dict:
     dataset = pydantic_evals.Dataset(
         cases=[pydantic_evals.Case(inputs=question, expected_output=expected_answer)],
@@ -42,5 +42,5 @@ async def evaluate_pydantic(
         "method": "Pydantic",
         "score": score,
         "reason": reason.reason if reason else "",
-        "passed": score >= judge_config.threshold,
+        "passed": score >= judge_config.threshold if score else -1,
     }
