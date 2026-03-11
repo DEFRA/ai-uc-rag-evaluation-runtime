@@ -1,9 +1,28 @@
-from pydantic import HttpUrl
+from pydantic import Field, HttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class LlmAsAJudgeConfig(BaseSettings):
+    model_config = SettingsConfigDict()
+    model_id: str = Field(..., alias="LLM_AS_A_JUDGE_MODEL_ID")
+    inference_profile_arn: str | None = Field(
+        None, alias="LLM_AS_A_JUDGE_INFERENCE_PROFILE_ARN"
+    )
+    temperature: float = Field(0, alias="LLM_AS_A_JUDGE_TEMPERATURE")
+    threshold: float = Field(0.5, alias="LLM_AS_A_JUDGE_THRESHOLD")
+    n_prompts: int = Field(10, alias="LLM_AS_A_JUDGE_N_PROMPTS")
+    max_tokens: int = Field(2048, alias="LLM_AS_A_JUDGE_MAX_TOKENS")
+
+
+class LlmConfig(BaseSettings):
+    model_config = SettingsConfigDict()
+    model_id: str = Field(..., alias="LLM_MODEL_ID")
+    inference_profile_arn: str | None = Field(None, alias="LLM_INFERENCE_PROFILE_ARN")
 
 
 class AppConfig(BaseSettings):
     model_config = SettingsConfigDict()
+    aws_region: str = Field(..., alias="AWS_REGION")
     python_env: str | None = None
     host: str = "127.0.0.1"
     port: int = 8086
@@ -15,6 +34,11 @@ class AppConfig(BaseSettings):
     http_proxy: HttpUrl | None = None
     enable_metrics: bool = False
     tracing_header: str = "x-cdp-request-id"
+    evaluation_data_service_url: HttpUrl | None = None
+    llm_as_a_judge_config: LlmAsAJudgeConfig = Field(
+        default_factory=lambda: LlmAsAJudgeConfig()
+    )
+    llm_config: LlmConfig = Field(default_factory=lambda: LlmConfig())
 
 
 config = AppConfig()
