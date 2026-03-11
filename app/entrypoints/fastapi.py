@@ -4,10 +4,16 @@ from logging import getLogger
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.requests import Request
+from fastapi.responses import JSONResponse
 
 from app.common.mongo import get_mongo_client
 from app.common.tracing import TraceIdMiddleware
 from app.config import config
+from app.evaluation.exceptions import (
+    EvaluationDataServiceError,
+    EvaluationDataServiceNotConfiguredError,
+)
 from app.evaluation.router import router as evaluation_router
 from app.example.router import router as example_router
 from app.health.router import router as health_router
@@ -28,6 +34,21 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.exception_handler(EvaluationDataServiceNotConfiguredError)
+async def not_configured_handler(
+    _: Request, exc: EvaluationDataServiceNotConfiguredError
+) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
+@app.exception_handler(EvaluationDataServiceError)
+async def data_service_error_handler(
+    _: Request, exc: EvaluationDataServiceError
+) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
 
 # Setup middleware
 app.add_middleware(TraceIdMiddleware)

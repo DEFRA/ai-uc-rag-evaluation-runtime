@@ -16,19 +16,12 @@ Return a score between 0 and 1 reflecting the correctness of the answer 0 is not
 """
 
 _judge_config = config.config.llm_as_a_judge_config
-_model: models.Model | str
-if _judge_config.inference_profile_arn:
-    _provider = BedrockProvider(region_name=config.config.aws_region)
-    # _judge_config.model_id
-    _profile = _provider.model_profile(_judge_config.model_id)
-
-    _model = BedrockConverseModel(
-        _judge_config.inference_profile_arn,
-        provider=_provider,
-        profile=_profile,
-    )
-else:
-    _model = f"bedrock:{_judge_config.model_id}"
+_provider = BedrockProvider(region_name=config.config.aws_region)
+_model: models.Model = BedrockConverseModel(
+    _judge_config.inference_profile_arn or _judge_config.model_id,
+    provider=_provider,
+    profile=_provider.model_profile(_judge_config.model_id),
+)
 
 _judge = pydantic_evals.evaluators.LLMJudge(
     model=_model,

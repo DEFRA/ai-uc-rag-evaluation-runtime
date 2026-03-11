@@ -14,6 +14,12 @@ class LlmAsAJudgeConfig(BaseSettings):
     max_tokens: int = Field(2048, alias="LLM_AS_A_JUDGE_MAX_TOKENS")
 
 
+class LlmConfig(BaseSettings):
+    model_config = SettingsConfigDict()
+    model_id: str = Field(..., alias="LLM_MODEL_ID")
+    inference_profile_arn: str | None = Field(None, alias="LLM_INFERENCE_PROFILE_ARN")
+
+
 class AppConfig(BaseSettings):
     model_config = SettingsConfigDict()
     aws_region: str = Field(..., alias="AWS_REGION")
@@ -32,6 +38,7 @@ class AppConfig(BaseSettings):
     llm_as_a_judge_config: LlmAsAJudgeConfig = Field(
         default_factory=lambda: LlmAsAJudgeConfig()
     )
+    llm_config: LlmConfig = Field(default_factory=lambda: LlmConfig())
 
 
 config = AppConfig()
