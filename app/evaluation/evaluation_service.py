@@ -11,8 +11,16 @@ import app.config as config
 logger = getLogger(__name__)
 
 _rubric = """
-You are an agent to determine the correctness of the answer provided compared to the expected answer.
-Return a score between 0 and 1 reflecting the correctness of the answer 0 is not very correct and 1 is very correct.
+You are evaluating whether an answer correctly and completely addresses a question based on an expected answer.
+
+Score the answer from 0 to 1 using these criteria:
+- 1.0: Fully correct and complete — captures all key information from the expected answer
+- 0.75: Mostly correct — captures the main points but misses minor details
+- 0.5: Partially correct — contains some accurate information but is missing significant content or contains inaccuracies
+- 0.25: Mostly incorrect — touches on the topic but is largely wrong or incomplete
+- 0.0: Completely incorrect or irrelevant to the question
+
+Focus on factual accuracy and completeness relative to the expected answer. Ignore differences in phrasing or style.
 """
 
 _judge_config = config.config.llm_as_a_judge_config
