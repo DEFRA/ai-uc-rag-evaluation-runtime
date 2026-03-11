@@ -5,4 +5,9 @@ import pytest
 
 def pytest_configure(config: pytest.Config) -> None:  # noqa: ARG001
     """Set environment variables before any imports happen."""
-    os.environ.update({"LLM_AS_A_JUDGE_MODEL_ID": "test-model-id"})
+    os.environ.update(
+        {
+            "LLM_AS_A_JUDGE_MODEL_ID": "test-model-id",
+            "AWS_REGION": "eu-west-2",
+        }
+    )
