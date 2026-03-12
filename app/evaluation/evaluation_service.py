@@ -3,7 +3,7 @@ from logging import getLogger
 import pydantic_evals
 import pydantic_evals.evaluators
 from pydantic_ai import models
-from pydantic_ai.models.bedrock import BedrockConverseModel
+from pydantic_ai.models.bedrock import BedrockConverseModel, BedrockModelSettings
 from pydantic_ai.providers.bedrock import BedrockProvider
 
 import app.config as config
@@ -25,10 +25,23 @@ Focus on factual accuracy and completeness relative to the expected answer. Igno
 
 _judge_config = config.config.llm_as_a_judge_config
 _provider = BedrockProvider(region_name=config.config.aws_region)
+_settings = (
+    BedrockModelSettings(
+        bedrock_guardrail_config={
+            "guardrailIdentifier": _judge_config.guardrails_id,
+            "guardrailVersion": _judge_config.guardrails_version,
+            "trace": "enabled",
+        }
+    )
+    if _judge_config.guardrails_id
+    else None
+)
+
 _model: models.Model = BedrockConverseModel(
     _judge_config.inference_profile_arn or _judge_config.model_id,
     provider=_provider,
     profile=_provider.model_profile(_judge_config.model_id),
+    settings=_settings,
 )
 
 _judge = pydantic_evals.evaluators.LLMJudge(

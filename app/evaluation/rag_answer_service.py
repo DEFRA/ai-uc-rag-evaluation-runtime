@@ -23,10 +23,6 @@ _settings = (
     else None
 )
 
-
-print("-----------------------------")
-print(_settings)
-
 _model: models.Model = BedrockConverseModel(
     _cfg.inference_profile_arn or _cfg.model_id,
     provider=_provider,
