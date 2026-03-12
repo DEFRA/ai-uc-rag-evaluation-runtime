@@ -211,10 +211,51 @@ def test_list_runs(mocker: MockerFixture) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "runs": [
-            {"run_id": "run-1", "status": "completed"},
-            {"run_id": "run-2", "status": "in_progress"},
+            {
+                "run_id": "run-1",
+                "status": "completed",
+                "results_url": "/evaluation/runs/run-1/results",
+            },
+            {
+                "run_id": "run-2",
+                "status": "in_progress",
+                "results_url": "/evaluation/runs/run-2/results",
+            },
         ]
     }
+
+
+def test_get_run_results(mocker: MockerFixture) -> None:
+    mocker.patch.object(
+        runs_repository,
+        "get_run",
+        new=mocker.AsyncMock(
+            return_value={
+                "run_id": "run-1",
+                "status": "completed",
+                "group_id": "g1",
+                "result": {"results": [{"score": 0.9}]},
+            }
+        ),
+    )
+
+    response = client.get("/evaluation/runs/run-1/results")
+
+    assert response.status_code == 200
+    assert response.json()["run_id"] == "run-1"
+    assert response.json()["result"]["results"] == [{"score": 0.9}]
+
+
+def test_get_run_results_not_found(mocker: MockerFixture) -> None:
+    mocker.patch.object(
+        runs_repository,
+        "get_run",
+        new=mocker.AsyncMock(return_value=None),
+    )
+
+    response = client.get("/evaluation/runs/unknown/results")
+
+    assert response.status_code == 404
 
 
 def test_queue_evaluation_not_configured(mocker: MockerFixture) -> None:

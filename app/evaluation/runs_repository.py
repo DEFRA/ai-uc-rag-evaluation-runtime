@@ -45,5 +45,11 @@ async def list_runs() -> list[dict[str, Any]]:
     return list(await cursor.to_list())
 
 
+async def get_run(run_id: str) -> dict[str, Any] | None:
+    col = await _collection()
+    result: dict[str, Any] | None = await col.find_one({"run_id": run_id}, {"_id": 0})
+    return result
+
+
 def new_run_id() -> str:
     return str(uuid.uuid4())

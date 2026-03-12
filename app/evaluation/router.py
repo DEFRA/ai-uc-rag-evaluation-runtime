@@ -66,9 +66,20 @@ async def queue_evaluation(request: QueueEvaluationRequest) -> JSONResponse:
 
 @router.get("/evaluation/runs")
 async def list_runs() -> JSONResponse:
-    """List all evaluation runs with their run_id and status."""
+    """List all evaluation runs with their run_id, status and a link to results."""
     runs = await runs_repository.list_runs()
+    for run in runs:
+        run["results_url"] = f"/evaluation/runs/{run['run_id']}/results"
     return JSONResponse(content={"runs": runs})
+
+
+@router.get("/evaluation/runs/{run_id}/results")
+async def get_run_results(run_id: str) -> JSONResponse:
+    """Return the full results for a single evaluation run."""
+    run = await runs_repository.get_run(run_id)
+    if run is None:
+        return JSONResponse(status_code=404, content={"detail": "Run not found"})
+    return JSONResponse(content=run)
 
 
 @router.get("/rag/answer")
