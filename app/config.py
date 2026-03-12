@@ -18,6 +18,8 @@ class LlmConfig(BaseSettings):
     model_config = SettingsConfigDict()
     model_id: str = Field(..., alias="LLM_MODEL_ID")
     inference_profile_arn: str | None = Field(None, alias="LLM_INFERENCE_PROFILE_ARN")
+    guardrails_id: str | None = Field(None, alias="LLM_GUARDRAILS_ID")
+    guardrails_version: str | None = Field(None, alias="LLM_GUARDRAILS_VERSION")
 
 
 class AppConfig(BaseSettings):
