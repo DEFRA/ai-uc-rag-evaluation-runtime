@@ -11,13 +11,17 @@ logger = getLogger(__name__)
 
 _cfg = config.config.llm_config
 _provider = BedrockProvider(region_name=config.config.aws_region)
-_settings = BedrockModelSettings(
+_settings = (
+    BedrockModelSettings(
         bedrock_guardrail_config={
             "guardrailIdentifier": _cfg.guardrails_id,
             "guardrailVersion": _cfg.guardrails_version,
             "trace": "enabled",
         }
-    ) if _cfg.guardrails_id else None
+    )
+    if _cfg.guardrails_id
+    else None
+)
 
 
 print("-----------------------------")
