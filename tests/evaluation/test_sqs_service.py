@@ -1,0 +1,42 @@
+import json
+
+import pytest
+from pytest_mock import MockerFixture
+
+import app.evaluation.sqs_service as sqs_service
+
+
+async def test_enqueue_evaluation_sends_message(mocker: MockerFixture) -> None:
+    mocker.patch(
+        "app.evaluation.sqs_service.config.config.rag_evaluation_start_queue_url",
+        "http://localhost:4566/000000000000/rag_evaluation_start.fifo",
+    )
+    mock_client = mocker.MagicMock()
+    mocker.patch("app.evaluation.sqs_service.boto3.client", return_value=mock_client)
+
+    await sqs_service.enqueue_evaluation("group1", "test query", "expected answer")
+
+    mock_client.send_message.assert_called_once_with(
+        QueueUrl="http://localhost:4566/000000000000/rag_evaluation_start.fifo",
+        MessageBody=json.dumps(
+            {
+                "group_id": "group1",
+                "query": "test query",
+                "expected_answer": "expected answer",
+                "snapshot_id": None,
+            }
+        ),
+        MessageGroupId="group1",
+    )
+
+
+async def test_enqueue_evaluation_raises_when_not_configured(
+    mocker: MockerFixture,
+) -> None:
+    mocker.patch(
+        "app.evaluation.sqs_service.config.config.rag_evaluation_start_queue_url",
+        None,
+    )
+
+    with pytest.raises(ValueError, match="RAG_EVALUATION_START_QUEUE_URL"):
+        await sqs_service.enqueue_evaluation("group1", "test query", "expected answer")

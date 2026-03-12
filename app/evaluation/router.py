@@ -2,11 +2,20 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 import app.evaluation.evaluation_service as evaluation_service
 import app.evaluation.rag_answer_service as rag_answer_service
+import app.evaluation.sqs_service as sqs_service
 
 router = APIRouter(tags=["evaluation"])
+
+
+class QueueEvaluationRequest(BaseModel):
+    group_id: str
+    query: str
+    expected_answer: str
+    snapshot_id: str | None = None
 
 
 @router.get("/evaluation/rag")
@@ -21,15 +30,22 @@ async def trigger_rag_evaluation(
     """
     Trigger a RAG evaluation by querying the evaluation-data service snapshots endpoint.
     """
-    answer = await rag_answer_service.answer_with_rag(query, group_id, max_results)
-
-    evaluated_content = await evaluation_service.evaluate_pydantic(
-        query,
-        expected_answer,
-        answer,
+    result = await evaluation_service.run_rag_evaluation(
+        group_id, query, expected_answer, max_results
     )
+    return JSONResponse(content=result)
 
-    return JSONResponse(content=evaluated_content)
+
+@router.post("/evaluation/queue")
+async def queue_evaluation(request: QueueEvaluationRequest) -> JSONResponse:
+    """Enqueue a RAG evaluation request for background processing."""
+    await sqs_service.enqueue_evaluation(
+        request.group_id, request.query, request.expected_answer, request.snapshot_id
+    )
+    return JSONResponse(
+        status_code=202,
+        content={"queued": True, "group_id": request.group_id, "query": request.query},
+    )
 
 
 @router.get("/rag/answer")

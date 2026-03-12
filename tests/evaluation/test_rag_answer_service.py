@@ -65,4 +65,4 @@ async def test_answer_with_rag_passes_max_results_to_snapshot(
 
     await rag_answer_service.answer_with_rag("query", "group-1", max_results=10)
 
-    mock_snapshot.assert_called_once_with("group-1", "query", 10)
+    mock_snapshot.assert_called_once_with("group-1", "query", 10, None)

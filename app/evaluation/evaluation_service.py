@@ -7,6 +7,7 @@ from pydantic_ai.models.bedrock import BedrockConverseModel, BedrockModelSetting
 from pydantic_ai.providers.bedrock import BedrockProvider
 
 import app.config as config
+import app.evaluation.rag_answer_service as rag_answer_service
 
 logger = getLogger(__name__)
 
@@ -55,6 +56,21 @@ _judge = pydantic_evals.evaluators.LLMJudge(
     include_input=True,
     include_expected_output=True,
 )
+
+
+async def run_rag_evaluation(
+    group_id: str,
+    query: str,
+    expected_answer: str,
+    max_results: int = 5,
+    snapshot_id: str | None = None,
+) -> dict:
+    answer = await rag_answer_service.answer_with_rag(
+        query, group_id, max_results, snapshot_id
+    )
+    result = await evaluate_pydantic(query, expected_answer, answer)
+    logger.info("RAG evaluation complete for group %s: %s", group_id, result)
+    return result
 
 
 async def evaluate_pydantic(

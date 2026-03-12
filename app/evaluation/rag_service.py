@@ -12,7 +12,10 @@ logger = getLogger(__name__)
 
 
 async def query_snapshot(
-    group_id: str, query: str, max_results: int
+    group_id: str,
+    query: str,
+    max_results: int,
+    snapshot_id: str | None = None,
 ) -> list[dict[str, Any]]:
     if not config.config.evaluation_data_service_url:
         raise EvaluationDataServiceNotConfiguredError()
@@ -20,11 +23,13 @@ async def query_snapshot(
     url = (
         f"{str(config.config.evaluation_data_service_url).rstrip('/')}/snapshots/query"
     )
-    body = {
+    body: dict[str, Any] = {
         "groupId": group_id,
         "query": query,
         "maxResults": max_results,
     }
+    if snapshot_id is not None:
+        body["snapshotId"] = snapshot_id
     async with http_client.create_async_client() as client:
         response = await client.post(url, json=body)
 

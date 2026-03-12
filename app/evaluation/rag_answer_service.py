@@ -40,8 +40,15 @@ _agent: Agent[None, str] = Agent(
 )
 
 
-async def answer_with_rag(query: str, group_id: str, max_results: int = 5) -> str:
-    documents = await rag_service.query_snapshot(group_id, query, max_results)
+async def answer_with_rag(
+    query: str,
+    group_id: str,
+    max_results: int = 5,
+    snapshot_id: str | None = None,
+) -> str:
+    documents = await rag_service.query_snapshot(
+        group_id, query, max_results, snapshot_id
+    )
     context = "\n\n".join(str(doc.get("content", "")) for doc in documents)
     result = await _agent.run(f"Context documents:\n{context}\n\nQuestion: {query}")
     return result.output

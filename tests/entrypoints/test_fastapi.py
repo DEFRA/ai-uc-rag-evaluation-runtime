@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 
 import app.evaluation.rag_answer_service as rag_answer_service
+import app.evaluation.sqs_service as sqs_service
 from app.entrypoints.fastapi import app
 
 client = TestClient(app)
@@ -11,6 +12,10 @@ def test_lifespan(mocker: MockerFixture) -> None:
     mock_mongo_client = mocker.AsyncMock()
     mock_get_mongo = mocker.patch(
         "app.entrypoints.fastapi.get_mongo_client", return_value=mock_mongo_client
+    )
+    mocker.patch(
+        "app.entrypoints.fastapi.listen",
+        new=mocker.AsyncMock(return_value=None),
     )
 
     # Using TestClient as a context manager triggers lifespan startup/shutdown
@@ -129,34 +134,7 @@ def test_evaluation_rag_not_configured(mocker: MockerFixture) -> None:
 
 def test_evaluation_rag_success(mocker: MockerFixture) -> None:
     mocker.patch(
-        "app.evaluation.rag_service.config.config.evaluation_data_service_url",
-        "http://data-service.example/",
-    )
-    mock_response = mocker.MagicMock()
-    mock_response.status_code = 200
-    mock_response.content = b'[{"content": "doc1"}]'
-    mock_response.json = mocker.MagicMock(return_value=[{"content": "doc1"}])
-
-    mock_client = mocker.MagicMock()
-    mock_client.post = mocker.AsyncMock(return_value=mock_response)
-    mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = mocker.AsyncMock(return_value=None)
-
-    mocker.patch(
-        "app.evaluation.rag_service.http_client.create_async_client",
-        return_value=mock_client,
-    )
-
-    mock_agent_result = mocker.MagicMock()
-    mock_agent_result.output = "The answer."
-    mocker.patch.object(
-        rag_answer_service._agent,
-        "run",
-        new=mocker.AsyncMock(return_value=mock_agent_result),
-    )
-
-    mocker.patch(
-        "app.evaluation.router.evaluation_service.evaluate_pydantic",
+        "app.evaluation.router.evaluation_service.run_rag_evaluation",
         new=mocker.AsyncMock(
             return_value={
                 "method": "Pydantic",
@@ -184,35 +162,59 @@ def test_evaluation_rag_success(mocker: MockerFixture) -> None:
         "reason": "match",
         "passed": True,
     }
-    call_kwargs = mock_client.post.call_args[1]
-    assert call_kwargs["json"] == {
-        "groupId": "g1",
-        "query": "test query",
-        "maxResults": 3,
-    }
+
+
+def test_queue_evaluation_success(mocker: MockerFixture) -> None:
+    mocker.patch.object(
+        sqs_service,
+        "enqueue_evaluation",
+        new=mocker.AsyncMock(return_value=None),
+    )
+
+    response = client.post(
+        "/evaluation/queue",
+        json={
+            "group_id": "g1",
+            "query": "test query",
+            "expected_answer": "expected answer",
+        },
+    )
+
+    assert response.status_code == 202
+    assert response.json() == {"queued": True, "group_id": "g1", "query": "test query"}
+    sqs_service.enqueue_evaluation.assert_awaited_once_with(  # type: ignore[attr-defined]
+        "g1", "test query", "expected answer", None
+    )
+
+
+def test_queue_evaluation_not_configured(mocker: MockerFixture) -> None:
+    mocker.patch.object(
+        sqs_service,
+        "enqueue_evaluation",
+        new=mocker.AsyncMock(
+            side_effect=ValueError("RAG_EVALUATION_START_QUEUE_URL is not configured")
+        ),
+    )
+
+    response = client.post(
+        "/evaluation/queue",
+        json={"group_id": "g1", "query": "test query", "expected_answer": "expected"},
+    )
+
+    assert response.status_code == 503
+    assert "RAG_EVALUATION_START_QUEUE_URL" in response.json()["detail"]
 
 
 def test_evaluation_rag_upstream_error(mocker: MockerFixture) -> None:
-    mocker.patch(
-        "app.evaluation.rag_service.config.config.evaluation_data_service_url",
-        "http://data-service.example/",
-    )
-    mock_response = mocker.MagicMock()
-    mock_response.status_code = 400
-    mock_response.content = b'{"detail": "Knowledge group not found"}'
-    mock_response.json = mocker.MagicMock(
-        return_value={"detail": "Knowledge group not found"}
-    )
-    mock_response.text = "Knowledge group not found"
-
-    mock_client = mocker.MagicMock()
-    mock_client.post = mocker.AsyncMock(return_value=mock_response)
-    mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = mocker.AsyncMock(return_value=None)
+    from app.evaluation.exceptions import EvaluationDataServiceError
 
     mocker.patch(
-        "app.evaluation.rag_service.http_client.create_async_client",
-        return_value=mock_client,
+        "app.evaluation.router.evaluation_service.run_rag_evaluation",
+        new=mocker.AsyncMock(
+            side_effect=EvaluationDataServiceError(
+                400, {"detail": "Knowledge group not found"}
+            )
+        ),
     )
 
     response = client.get(
