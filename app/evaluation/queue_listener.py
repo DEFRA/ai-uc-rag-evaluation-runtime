@@ -54,13 +54,18 @@ async def listen() -> None:
             run_id: str = body["run_id"]
             logger.info("Received evaluation request: %s", run_id)
             await runs_repository.update_status(run_id, "in_progress")
-            result = await evaluation_service.run_rag_evaluation(
-                body["group_id"],
-                body["query"],
-                body["expected_answer"],
-                snapshot_id=body.get("snapshot_id"),
+            results = []
+            for item in body["queries"]:
+                result = await evaluation_service.run_rag_evaluation(
+                    body["group_id"],
+                    item["query"],
+                    item["expected_answer"],
+                    snapshot_id=body.get("snapshot_id"),
+                )
+                results.append(result)
+            await runs_repository.update_status(
+                run_id, "completed", {"results": results}
             )
-            await runs_repository.update_status(run_id, "completed", result)
             await asyncio.to_thread(_delete, queue_url, msg["ReceiptHandle"])
         except asyncio.CancelledError:
             logger.info("Queue listener cancelled")

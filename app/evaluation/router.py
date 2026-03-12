@@ -12,10 +12,14 @@ import app.evaluation.sqs_service as sqs_service
 router = APIRouter(tags=["evaluation"])
 
 
-class QueueEvaluationRequest(BaseModel):
-    group_id: str
+class EvaluationItem(BaseModel):
     query: str
     expected_answer: str
+
+
+class QueueEvaluationRequest(BaseModel):
+    group_id: str
+    queries: list[EvaluationItem]
     snapshot_id: str | None = None
 
 
@@ -41,18 +45,17 @@ async def trigger_rag_evaluation(
 async def queue_evaluation(request: QueueEvaluationRequest) -> JSONResponse:
     """Enqueue a RAG evaluation request for background processing."""
     run_id = runs_repository.new_run_id()
+    queries = [item.model_dump() for item in request.queries]
     await runs_repository.create_run(
         run_id,
         request.group_id,
-        request.query,
-        request.expected_answer,
+        queries,
         request.snapshot_id,
     )
     await sqs_service.enqueue_evaluation(
         run_id,
         request.group_id,
-        request.query,
-        request.expected_answer,
+        queries,
         request.snapshot_id,
     )
     return JSONResponse(

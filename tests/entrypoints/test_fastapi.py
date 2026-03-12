@@ -174,22 +174,23 @@ def test_queue_evaluation_success(mocker: MockerFixture) -> None:
         sqs_service, "enqueue_evaluation", new=mocker.AsyncMock(return_value=None)
     )
 
+    queries = [
+        {"query": "question 1", "expected_answer": "answer 1"},
+        {"query": "question 2", "expected_answer": "answer 2"},
+    ]
+
     response = client.post(
         "/evaluation/queue",
-        json={
-            "group_id": "g1",
-            "query": "test query",
-            "expected_answer": "expected answer",
-        },
+        json={"group_id": "g1", "queries": queries},
     )
 
     assert response.status_code == 202
     assert response.json() == {"run_id": "test-run-id", "status": "accepted"}
     runs_repository.create_run.assert_awaited_once_with(  # type: ignore[attr-defined]
-        "test-run-id", "g1", "test query", "expected answer", None
+        "test-run-id", "g1", queries, None
     )
     sqs_service.enqueue_evaluation.assert_awaited_once_with(  # type: ignore[attr-defined]
-        "test-run-id", "g1", "test query", "expected answer", None
+        "test-run-id", "g1", queries, None
     )
 
 
@@ -217,6 +218,10 @@ def test_list_runs(mocker: MockerFixture) -> None:
 
 
 def test_queue_evaluation_not_configured(mocker: MockerFixture) -> None:
+    mocker.patch.object(runs_repository, "new_run_id", return_value="test-run-id")
+    mocker.patch.object(
+        runs_repository, "create_run", new=mocker.AsyncMock(return_value=None)
+    )
     mocker.patch.object(
         sqs_service,
         "enqueue_evaluation",
@@ -227,7 +232,10 @@ def test_queue_evaluation_not_configured(mocker: MockerFixture) -> None:
 
     response = client.post(
         "/evaluation/queue",
-        json={"group_id": "g1", "query": "test query", "expected_answer": "expected"},
+        json={
+            "group_id": "g1",
+            "queries": [{"query": "q", "expected_answer": "a"}],
+        },
     )
 
     assert response.status_code == 503

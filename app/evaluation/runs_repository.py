@@ -16,8 +16,7 @@ async def _collection() -> Any:
 async def create_run(
     run_id: str,
     group_id: str,
-    query: str,
-    expected_answer: str,
+    queries: list[dict],
     snapshot_id: str | None,
 ) -> None:
     col = await _collection()
@@ -26,8 +25,7 @@ async def create_run(
             "run_id": run_id,
             "status": "accepted",
             "group_id": group_id,
-            "query": query,
-            "expected_answer": expected_answer,
+            "queries": queries,
             "snapshot_id": snapshot_id,
         }
     )

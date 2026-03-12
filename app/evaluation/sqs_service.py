@@ -20,8 +20,7 @@ def _get_client() -> object:
 async def enqueue_evaluation(
     run_id: str,
     group_id: str,
-    query: str,
-    expected_answer: str,
+    queries: list[dict],
     snapshot_id: str | None = None,
 ) -> None:
     queue_url = config.config.rag_evaluation_start_queue_url
@@ -29,11 +28,10 @@ async def enqueue_evaluation(
         msg = "RAG_EVALUATION_START_QUEUE_URL is not configured"
         raise ValueError(msg)
 
-    message: dict[str, str | None] = {
+    message: dict = {
         "run_id": run_id,
         "group_id": group_id,
-        "query": query,
-        "expected_answer": expected_answer,
+        "queries": queries,
         "snapshot_id": snapshot_id,
     }
 

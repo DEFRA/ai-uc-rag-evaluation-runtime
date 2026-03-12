@@ -30,8 +30,10 @@ async def test_listen_logs_received_messages(mocker: MockerFixture) -> None:
     message_body = {
         "run_id": "run-1",
         "group_id": "group1",
-        "query": "test query",
-        "expected_answer": "expected",
+        "queries": [
+            {"query": "question 1", "expected_answer": "answer 1"},
+            {"query": "question 2", "expected_answer": "answer 2"},
+        ],
     }
     mock_messages = [{"Body": json.dumps(message_body), "ReceiptHandle": "handle1"}]
 
@@ -64,10 +66,9 @@ async def test_listen_logs_received_messages(mocker: MockerFixture) -> None:
 
     mock_logger.info.assert_any_call("Received evaluation request: %s", "run-1")
     mock_update_status.assert_any_await("run-1", "in_progress")
-    mock_run.assert_awaited_once_with(
-        message_body["group_id"],
-        message_body["query"],
-        message_body["expected_answer"],
-        snapshot_id=None,
+    assert mock_run.await_count == 2
+    mock_run.assert_any_await("group1", "question 1", "answer 1", snapshot_id=None)
+    mock_run.assert_any_await("group1", "question 2", "answer 2", snapshot_id=None)
+    mock_update_status.assert_any_await(
+        "run-1", "completed", {"results": [{"score": 1.0}, {"score": 1.0}]}
     )
-    mock_update_status.assert_any_await("run-1", "completed", {"score": 1.0})
