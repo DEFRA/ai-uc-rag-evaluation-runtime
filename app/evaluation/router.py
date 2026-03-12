@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 import app.evaluation.evaluation_service as evaluation_service
 import app.evaluation.rag_answer_service as rag_answer_service
+import app.evaluation.runs_repository as runs_repository
 import app.evaluation.sqs_service as sqs_service
 
 router = APIRouter(tags=["evaluation"])
@@ -39,13 +40,32 @@ async def trigger_rag_evaluation(
 @router.post("/evaluation/queue")
 async def queue_evaluation(request: QueueEvaluationRequest) -> JSONResponse:
     """Enqueue a RAG evaluation request for background processing."""
+    run_id = runs_repository.new_run_id()
+    await runs_repository.create_run(
+        run_id,
+        request.group_id,
+        request.query,
+        request.expected_answer,
+        request.snapshot_id,
+    )
     await sqs_service.enqueue_evaluation(
-        request.group_id, request.query, request.expected_answer, request.snapshot_id
+        run_id,
+        request.group_id,
+        request.query,
+        request.expected_answer,
+        request.snapshot_id,
     )
     return JSONResponse(
         status_code=202,
-        content={"queued": True, "group_id": request.group_id, "query": request.query},
+        content={"run_id": run_id, "status": "accepted"},
     )
+
+
+@router.get("/evaluation/runs")
+async def list_runs() -> JSONResponse:
+    """List all evaluation runs with their run_id and status."""
+    runs = await runs_repository.list_runs()
+    return JSONResponse(content={"runs": runs})
 
 
 @router.get("/rag/answer")

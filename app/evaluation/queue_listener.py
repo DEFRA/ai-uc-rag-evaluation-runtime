@@ -7,6 +7,7 @@ import boto3
 
 import app.config as config
 import app.evaluation.evaluation_service as evaluation_service
+import app.evaluation.runs_repository as runs_repository
 
 logger = getLogger(__name__)
 
@@ -50,13 +51,16 @@ async def listen() -> None:
             if msg is None:
                 continue
             body: dict[str, Any] = json.loads(msg["Body"])
-            logger.info("Received evaluation request: %s", body)
-            await evaluation_service.run_rag_evaluation(
+            run_id: str = body["run_id"]
+            logger.info("Received evaluation request: %s", run_id)
+            await runs_repository.update_status(run_id, "in_progress")
+            result = await evaluation_service.run_rag_evaluation(
                 body["group_id"],
                 body["query"],
                 body["expected_answer"],
                 snapshot_id=body.get("snapshot_id"),
             )
+            await runs_repository.update_status(run_id, "completed", result)
             await asyncio.to_thread(_delete, queue_url, msg["ReceiptHandle"])
         except asyncio.CancelledError:
             logger.info("Queue listener cancelled")

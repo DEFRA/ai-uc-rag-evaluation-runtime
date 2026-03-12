@@ -14,12 +14,15 @@ async def test_enqueue_evaluation_sends_message(mocker: MockerFixture) -> None:
     mock_client = mocker.MagicMock()
     mocker.patch("app.evaluation.sqs_service.boto3.client", return_value=mock_client)
 
-    await sqs_service.enqueue_evaluation("group1", "test query", "expected answer")
+    await sqs_service.enqueue_evaluation(
+        "run-1", "group1", "test query", "expected answer"
+    )
 
     mock_client.send_message.assert_called_once_with(
         QueueUrl="http://localhost:4566/000000000000/rag_evaluation_start.fifo",
         MessageBody=json.dumps(
             {
+                "run_id": "run-1",
                 "group_id": "group1",
                 "query": "test query",
                 "expected_answer": "expected answer",
@@ -39,4 +42,6 @@ async def test_enqueue_evaluation_raises_when_not_configured(
     )
 
     with pytest.raises(ValueError, match="RAG_EVALUATION_START_QUEUE_URL"):
-        await sqs_service.enqueue_evaluation("group1", "test query", "expected answer")
+        await sqs_service.enqueue_evaluation(
+            "run-1", "group1", "test query", "expected answer"
+        )

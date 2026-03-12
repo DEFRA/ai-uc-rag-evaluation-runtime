@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 
 import app.evaluation.rag_answer_service as rag_answer_service
+import app.evaluation.runs_repository as runs_repository
 import app.evaluation.sqs_service as sqs_service
 from app.entrypoints.fastapi import app
 
@@ -165,10 +166,12 @@ def test_evaluation_rag_success(mocker: MockerFixture) -> None:
 
 
 def test_queue_evaluation_success(mocker: MockerFixture) -> None:
+    mocker.patch.object(runs_repository, "new_run_id", return_value="test-run-id")
     mocker.patch.object(
-        sqs_service,
-        "enqueue_evaluation",
-        new=mocker.AsyncMock(return_value=None),
+        runs_repository, "create_run", new=mocker.AsyncMock(return_value=None)
+    )
+    mocker.patch.object(
+        sqs_service, "enqueue_evaluation", new=mocker.AsyncMock(return_value=None)
     )
 
     response = client.post(
@@ -181,10 +184,36 @@ def test_queue_evaluation_success(mocker: MockerFixture) -> None:
     )
 
     assert response.status_code == 202
-    assert response.json() == {"queued": True, "group_id": "g1", "query": "test query"}
-    sqs_service.enqueue_evaluation.assert_awaited_once_with(  # type: ignore[attr-defined]
-        "g1", "test query", "expected answer", None
+    assert response.json() == {"run_id": "test-run-id", "status": "accepted"}
+    runs_repository.create_run.assert_awaited_once_with(  # type: ignore[attr-defined]
+        "test-run-id", "g1", "test query", "expected answer", None
     )
+    sqs_service.enqueue_evaluation.assert_awaited_once_with(  # type: ignore[attr-defined]
+        "test-run-id", "g1", "test query", "expected answer", None
+    )
+
+
+def test_list_runs(mocker: MockerFixture) -> None:
+    mocker.patch.object(
+        runs_repository,
+        "list_runs",
+        new=mocker.AsyncMock(
+            return_value=[
+                {"run_id": "run-1", "status": "completed"},
+                {"run_id": "run-2", "status": "in_progress"},
+            ]
+        ),
+    )
+
+    response = client.get("/evaluation/runs")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "runs": [
+            {"run_id": "run-1", "status": "completed"},
+            {"run_id": "run-2", "status": "in_progress"},
+        ]
+    }
 
 
 def test_queue_evaluation_not_configured(mocker: MockerFixture) -> None:

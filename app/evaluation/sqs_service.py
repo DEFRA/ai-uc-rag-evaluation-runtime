@@ -18,6 +18,7 @@ def _get_client() -> object:
 
 
 async def enqueue_evaluation(
+    run_id: str,
     group_id: str,
     query: str,
     expected_answer: str,
@@ -29,6 +30,7 @@ async def enqueue_evaluation(
         raise ValueError(msg)
 
     message: dict[str, str | None] = {
+        "run_id": run_id,
         "group_id": group_id,
         "query": query,
         "expected_answer": expected_answer,

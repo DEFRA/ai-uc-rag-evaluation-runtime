@@ -6,6 +6,7 @@ from pytest_mock import MockerFixture
 
 import app.evaluation.evaluation_service as evaluation_service
 import app.evaluation.queue_listener as queue_listener
+import app.evaluation.runs_repository as runs_repository
 
 
 async def test_listen_disabled_when_not_configured(mocker: MockerFixture) -> None:
@@ -27,6 +28,7 @@ async def test_listen_logs_received_messages(mocker: MockerFixture) -> None:
     )
 
     message_body = {
+        "run_id": "run-1",
         "group_id": "group1",
         "query": "test query",
         "expected_answer": "expected",
@@ -47,20 +49,25 @@ async def test_listen_logs_received_messages(mocker: MockerFixture) -> None:
         side_effect=fake_receive,
     )
     mocker.patch("app.evaluation.queue_listener._delete")
+    mock_update_status = mocker.patch.object(
+        runs_repository, "update_status", new=mocker.AsyncMock(return_value=None)
+    )
     mock_run = mocker.patch.object(
         evaluation_service,
         "run_rag_evaluation",
-        new=mocker.AsyncMock(return_value={}),
+        new=mocker.AsyncMock(return_value={"score": 1.0}),
     )
     mock_logger = mocker.patch("app.evaluation.queue_listener.logger")
 
     with contextlib.suppress(asyncio.CancelledError):
         await queue_listener.listen()
 
-    mock_logger.info.assert_any_call("Received evaluation request: %s", message_body)
+    mock_logger.info.assert_any_call("Received evaluation request: %s", "run-1")
+    mock_update_status.assert_any_await("run-1", "in_progress")
     mock_run.assert_awaited_once_with(
         message_body["group_id"],
         message_body["query"],
         message_body["expected_answer"],
         snapshot_id=None,
     )
+    mock_update_status.assert_any_await("run-1", "completed", {"score": 1.0})
