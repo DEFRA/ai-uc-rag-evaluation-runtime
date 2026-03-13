@@ -4,7 +4,7 @@ import json
 
 from pytest_mock import MockerFixture
 
-import app.evaluation.evaluation_service as evaluation_service
+import app.evaluation.judge_service as evaluation_service
 import app.evaluation.queue_listener as queue_listener
 import app.evaluation.rag_answer_service as rag_answer_service
 import app.evaluation.runs_repository as runs_repository
@@ -76,7 +76,7 @@ async def test_listen_processes_queries(mocker: MockerFixture) -> None:
     )
     mock_evaluate = mocker.patch.object(
         evaluation_service,
-        "evaluate_pydantic",
+        "evaluate_with_judge",
         new=mocker.AsyncMock(return_value=_make_result()),
     )
 
@@ -136,7 +136,7 @@ async def test_listen_skips_already_completed_combinations(
     )
     mock_evaluate = mocker.patch.object(
         evaluation_service,
-        "evaluate_pydantic",
+        "evaluate_with_judge",
         new=mocker.AsyncMock(return_value=_make_result()),
     )
 

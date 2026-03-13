@@ -20,9 +20,7 @@ async def query_snapshot(
     if not config.config.evaluation_data_service_url:
         raise EvaluationDataServiceNotConfiguredError()
 
-    url = (
-        f"{str(config.config.evaluation_data_service_url).rstrip('/')}/snapshots/query"
-    )
+    url = f"{config.config.evaluation_data_service_url}/snapshots/query"
     body: dict[str, Any] = {
         "groupId": group_id,
         "query": query,

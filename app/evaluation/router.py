@@ -2,9 +2,9 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+import app.evaluation.evaluation_service as evaluation_service
 import app.evaluation.runs_repository as runs_repository
-import app.evaluation.sqs_service as sqs_service
-from app.evaluation.models import EvaluationQuery, EvaluationRun
+from app.evaluation.models import EvaluationQuery
 
 router = APIRouter(tags=["evaluation"])
 
@@ -20,22 +20,14 @@ class QueueEvaluationRequest(BaseModel):
 @router.post("/evaluation")
 async def queue_evaluation(request: QueueEvaluationRequest) -> JSONResponse:
     """Enqueue a RAG evaluation request for background processing."""
-    run_id = runs_repository.new_run_id()
-    run = EvaluationRun(
-        run_id=run_id,
-        status="accepted",
-        group_id=request.group_id,
-        queries=request.queries,
-        snapshot_id=request.snapshot_id,
-        rubrics=request.rubrics,
-        models=request.models,
+    run = await evaluation_service.create_evaluation_run(
+        request.group_id,
+        request.queries,
+        request.snapshot_id,
+        request.rubrics,
+        request.models,
     )
-    await runs_repository.create_run(run)
-    await sqs_service.enqueue_evaluation(run_id)
-    return JSONResponse(
-        status_code=202,
-        content=run.model_dump(),
-    )
+    return JSONResponse(status_code=202, content=run.model_dump())
 
 
 @router.get("/evaluation")

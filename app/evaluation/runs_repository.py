@@ -1,4 +1,3 @@
-import uuid
 from typing import Any
 
 from app.common.mongo import get_mongo_client
@@ -41,7 +40,3 @@ async def get_run(run_id: str) -> EvaluationRun | None:
     col = await _collection()
     doc = await col.find_one({"run_id": run_id}, {"_id": 0})
     return EvaluationRun.model_validate(doc) if doc else None
-
-
-def new_run_id() -> str:
-    return str(uuid.uuid4())

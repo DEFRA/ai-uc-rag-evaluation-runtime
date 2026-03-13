@@ -1,10 +1,10 @@
 from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 
+import app.evaluation.evaluation_service as evaluation_service
 import app.evaluation.runs_repository as runs_repository
-import app.evaluation.sqs_service as sqs_service
 from app.entrypoints.fastapi import app
-from app.evaluation.models import EvaluationRun
+from app.evaluation.models import EvaluationQuery, EvaluationRun
 
 client = TestClient(app)
 
@@ -19,11 +19,11 @@ def test_lifespan(mocker: MockerFixture) -> None:
         new=mocker.AsyncMock(return_value=None),
     )
 
-    # Using TestClient as a context manager triggers lifespan startup/shutdown
-    with TestClient(app):
-        mock_get_mongo.assert_called_once()  # Startup: connect called
+    with client:
+        pass
 
-    mock_mongo_client.close.assert_awaited_once()  # Shutdown: close called
+    mock_get_mongo.assert_awaited_once()
+    mock_mongo_client.close.assert_awaited_once()
 
 
 def test_health() -> None:
@@ -37,25 +37,37 @@ def test_root() -> None:
     assert response.status_code == 404
 
 
-def test_queue_evaluation_success(mocker: MockerFixture) -> None:
-    mocker.patch.object(runs_repository, "new_run_id", return_value="test-run-id")
-    mocker.patch.object(
-        runs_repository, "create_run", new=mocker.AsyncMock(return_value=None)
-    )
-    mocker.patch.object(
-        sqs_service, "enqueue_evaluation", new=mocker.AsyncMock(return_value=None)
-    )
+def _make_run(**kwargs: object) -> EvaluationRun:
+    defaults: dict = {
+        "run_id": "test-run-id",
+        "status": "accepted",
+        "group_id": "g1",
+        "queries": [
+            EvaluationQuery(query="question 1", expected_answer="answer 1"),
+            EvaluationQuery(query="question 2", expected_answer="answer 2"),
+        ],
+        "snapshot_id": "snap-1",
+        "models": ["sonnet"],
+    }
+    return EvaluationRun(**{**defaults, **kwargs})
 
-    queries = [
-        {"query": "question 1", "expected_answer": "answer 1"},
-        {"query": "question 2", "expected_answer": "answer 2"},
-    ]
+
+def test_queue_evaluation_success(mocker: MockerFixture) -> None:
+    run = _make_run()
+    mocker.patch.object(
+        evaluation_service,
+        "create_evaluation_run",
+        new=mocker.AsyncMock(return_value=run),
+    )
 
     response = client.post(
         "/evaluation",
         json={
             "group_id": "g1",
-            "queries": queries,
+            "queries": [
+                {"query": "question 1", "expected_answer": "answer 1"},
+                {"query": "question 2", "expected_answer": "answer 2"},
+            ],
             "models": ["sonnet"],
             "snapshot_id": "snap-1",
         },
@@ -64,14 +76,7 @@ def test_queue_evaluation_success(mocker: MockerFixture) -> None:
     assert response.status_code == 202
     assert response.json()["run_id"] == "test-run-id"
     assert response.json()["status"] == "accepted"
-    call_args = runs_repository.create_run.call_args  # type: ignore[attr-defined]
-    run = call_args.args[0]
-    assert run.run_id == "test-run-id"
-    assert run.group_id == "g1"
-    assert [q.model_dump() for q in run.queries] == queries
-    sqs_service.enqueue_evaluation.assert_awaited_once_with(  # type: ignore[attr-defined]
-        "test-run-id"
-    )
+    evaluation_service.create_evaluation_run.assert_awaited_once()  # type: ignore[attr-defined]
 
 
 def test_list_runs(mocker: MockerFixture) -> None:
@@ -134,19 +139,15 @@ def test_get_run_results_not_found(mocker: MockerFixture) -> None:
         new=mocker.AsyncMock(return_value=None),
     )
 
-    response = client.get("/evaluation/runs/unknown/results")
+    response = client.get("/evaluation/unknown")
 
     assert response.status_code == 404
 
 
 def test_queue_evaluation_not_configured(mocker: MockerFixture) -> None:
-    mocker.patch.object(runs_repository, "new_run_id", return_value="test-run-id")
     mocker.patch.object(
-        runs_repository, "create_run", new=mocker.AsyncMock(return_value=None)
-    )
-    mocker.patch.object(
-        sqs_service,
-        "enqueue_evaluation",
+        evaluation_service,
+        "create_evaluation_run",
         new=mocker.AsyncMock(
             side_effect=ValueError("RAG_EVALUATION_START_QUEUE_URL is not configured")
         ),

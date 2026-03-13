@@ -8,7 +8,7 @@ from mypy_boto3_sqs import SQSClient
 from mypy_boto3_sqs.type_defs import MessageTypeDef
 
 import app.config as config
-import app.evaluation.evaluation_service as evaluation_service
+import app.evaluation.judge_service as judge_service
 import app.evaluation.rag_answer_service as rag_answer_service
 import app.evaluation.runs_repository as runs_repository
 from app.evaluation.models import EvaluationRun
@@ -62,7 +62,7 @@ async def _process(queue_url: str, msg: MessageTypeDef) -> None:
 async def _execute_run(run: EvaluationRun, run_id: str) -> None:
     await runs_repository.update_status(run_id, "in_progress")
 
-    effective_rubrics = run.rubrics or [evaluation_service.DEFAULT_RUBRIC]
+    effective_rubrics = run.rubrics or [judge_service.DEFAULT_RUBRIC]
     done = {(r.question, r.rubric, r.model) for r in run.results}
     for item in run.queries:
         answer = await rag_answer_service.answer_with_rag(
@@ -72,7 +72,7 @@ async def _execute_run(run: EvaluationRun, run_id: str) -> None:
             for model_key in run.models:
                 if (item.query, rubric, model_key) in done:
                     continue
-                result = await evaluation_service.evaluate_pydantic(
+                result = await judge_service.evaluate_with_judge(
                     item.query, item.expected_answer, answer, model_key, rubric
                 )
                 await runs_repository.append_result(run_id, result)
