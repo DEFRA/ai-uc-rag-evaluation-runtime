@@ -27,15 +27,19 @@ async def test_listen_logs_received_messages(mocker: MockerFixture) -> None:
         "http://localhost:4566/000000000000/rag_evaluation_start.fifo",
     )
 
-    message_body = {
+    message_body = {"run_id": "run-1"}
+    mock_messages = [{"Body": json.dumps(message_body), "ReceiptHandle": "handle1"}]
+    run_doc = {
         "run_id": "run-1",
         "group_id": "group1",
         "queries": [
             {"query": "question 1", "expected_answer": "answer 1"},
             {"query": "question 2", "expected_answer": "answer 2"},
         ],
+        "snapshot_id": None,
+        "rubrics": None,
+        "models": None,
     }
-    mock_messages = [{"Body": json.dumps(message_body), "ReceiptHandle": "handle1"}]
 
     call_count = 0
 
@@ -51,6 +55,9 @@ async def test_listen_logs_received_messages(mocker: MockerFixture) -> None:
         side_effect=fake_receive,
     )
     mocker.patch("app.evaluation.queue_listener._delete")
+    mocker.patch.object(
+        runs_repository, "get_run", new=mocker.AsyncMock(return_value=run_doc)
+    )
     mock_update_status = mocker.patch.object(
         runs_repository, "update_status", new=mocker.AsyncMock(return_value=None)
     )

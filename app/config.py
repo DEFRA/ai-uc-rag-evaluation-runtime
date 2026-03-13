@@ -11,7 +11,6 @@ class LlmAsAJudgeConfig(BaseSettings):
         None, alias="LLM_AS_A_JUDGE_INFERENCE_PROFILE_ARN"
     )
     temperature: float = Field(0, alias="LLM_AS_A_JUDGE_TEMPERATURE")
-    threshold: float = Field(0.5, alias="LLM_AS_A_JUDGE_THRESHOLD")
     n_prompts: int = Field(10, alias="LLM_AS_A_JUDGE_N_PROMPTS")
     max_tokens: int = Field(2048, alias="LLM_AS_A_JUDGE_MAX_TOKENS")
     guardrails_id: str | None = Field(None, alias="LLM_AS_A_JUDGE_GUARDRAILS_ID")

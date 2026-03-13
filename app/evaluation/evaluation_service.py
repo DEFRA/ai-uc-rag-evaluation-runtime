@@ -133,10 +133,11 @@ async def evaluate_pydantic(
     score = score_entry.value if score_entry else None
     reason = case_result.assertions.get("LLMJudge_pass")
     return {
-        "method": "Pydantic",
+        "question": question,
+        "expected_answer": expected_answer,
+        "actual_answer": actual_answer,
         "model": model_key if model_key is not None else _judge_config.model_id,
         "rubric": effective_rubric,
         "score": score,
         "reason": reason.reason if reason else "",
-        "passed": score >= _judge_config.threshold if score else -1,
     }

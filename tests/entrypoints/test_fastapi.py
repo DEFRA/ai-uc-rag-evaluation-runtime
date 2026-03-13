@@ -192,7 +192,7 @@ def test_queue_evaluation_success(mocker: MockerFixture) -> None:
         "test-run-id", "g1", queries, None, None, None
     )
     sqs_service.enqueue_evaluation.assert_awaited_once_with(  # type: ignore[attr-defined]
-        "test-run-id", "g1", queries, None, None, None
+        "test-run-id"
     )
 
 

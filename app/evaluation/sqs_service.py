@@ -17,34 +17,18 @@ def _get_client() -> object:
     )
 
 
-async def enqueue_evaluation(
-    run_id: str,
-    group_id: str,
-    queries: list[dict],
-    snapshot_id: str | None = None,
-    rubrics: list[str] | None = None,
-    models: list[str] | None = None,
-) -> None:
+async def enqueue_evaluation(run_id: str) -> None:
     queue_url = config.config.rag_evaluation_start_queue_url
     if not queue_url:
         msg = "RAG_EVALUATION_START_QUEUE_URL is not configured"
         raise ValueError(msg)
 
-    message: dict = {
-        "run_id": run_id,
-        "group_id": group_id,
-        "queries": queries,
-        "snapshot_id": snapshot_id,
-        "rubrics": rubrics,
-        "models": models,
-    }
-
     def _send() -> None:
         client = _get_client()
         client.send_message(  # type: ignore[attr-defined]
             QueueUrl=queue_url,
-            MessageBody=json.dumps(message),
-            MessageGroupId=group_id,
+            MessageBody=json.dumps({"run_id": run_id}),
+            MessageGroupId="run_evaluation",
         )
 
     await asyncio.to_thread(_send)

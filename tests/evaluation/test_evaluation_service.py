@@ -36,10 +36,8 @@ async def test_evaluate_pydantic_returns_pass_when_score_above_threshold(
         "The capital of France is Paris.",
     )
 
-    assert result["method"] == "Pydantic"
     assert result["score"] == 0.9
     assert result["reason"] == "Answer is correct."
-    assert result["passed"] is True
 
 
 async def test_evaluate_pydantic_returns_fail_when_score_below_threshold(
@@ -58,7 +56,6 @@ async def test_evaluate_pydantic_returns_fail_when_score_below_threshold(
     )
 
     assert result["score"] == 0.2
-    assert result["passed"] is False
 
 
 async def test_evaluate_pydantic_handles_missing_score(
@@ -76,4 +73,3 @@ async def test_evaluate_pydantic_handles_missing_score(
 
     assert result["score"] is None
     assert result["reason"] == ""
-    assert result["passed"] == -1

@@ -47,23 +47,15 @@ async def trigger_rag_evaluation(
 async def queue_evaluation(request: QueueEvaluationRequest) -> JSONResponse:
     """Enqueue a RAG evaluation request for background processing."""
     run_id = runs_repository.new_run_id()
-    queries = [item.model_dump() for item in request.queries]
     await runs_repository.create_run(
         run_id,
         request.group_id,
-        queries,
+        [item.model_dump() for item in request.queries],
         request.snapshot_id,
         request.rubrics,
         request.models,
     )
-    await sqs_service.enqueue_evaluation(
-        run_id,
-        request.group_id,
-        queries,
-        request.snapshot_id,
-        request.rubrics,
-        request.models,
-    )
+    await sqs_service.enqueue_evaluation(run_id)
     return JSONResponse(
         status_code=202,
         content={"run_id": run_id, "status": "accepted"},

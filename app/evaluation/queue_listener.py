@@ -53,15 +53,20 @@ async def listen() -> None:
             body: dict[str, Any] = json.loads(msg["Body"])
             run_id: str = body["run_id"]
             logger.info("Received evaluation request: %s", run_id)
+            run = await runs_repository.get_run(run_id)
+            if run is None:
+                logger.error("Run %s not found in database; skipping", run_id)
+                await asyncio.to_thread(_delete, queue_url, msg["ReceiptHandle"])
+                continue
             await runs_repository.update_status(run_id, "in_progress")
-            rubrics: list[str] | None = body.get("rubrics") or None
-            judge_model_keys: list[str] | None = body.get("models") or None
-            for item in body["queries"]:
+            rubrics: list[str] | None = run.get("rubrics") or None
+            judge_model_keys: list[str] | None = run.get("models") or None
+            for item in run["queries"]:
                 item_results = await evaluation_service.run_rag_evaluation(
-                    body["group_id"],
+                    run["group_id"],
                     item["query"],
                     item["expected_answer"],
-                    snapshot_id=body.get("snapshot_id"),
+                    snapshot_id=run.get("snapshot_id"),
                     rubrics=rubrics,
                     judge_model_keys=judge_model_keys,
                 )
