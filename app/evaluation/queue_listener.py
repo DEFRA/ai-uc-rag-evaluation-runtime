@@ -4,6 +4,8 @@ from logging import getLogger
 from typing import Any
 
 import boto3
+from mypy_boto3_sqs import SQSClient
+from mypy_boto3_sqs.type_defs import MessageTypeDef
 
 import app.config as config
 import app.evaluation.evaluation_service as evaluation_service
@@ -12,7 +14,7 @@ import app.evaluation.runs_repository as runs_repository
 logger = getLogger(__name__)
 
 
-def _get_client() -> Any:
+def _get_client() -> SQSClient:
     return boto3.client(
         "sqs",
         region_name=config.config.aws_region,
@@ -20,14 +22,14 @@ def _get_client() -> Any:
     )
 
 
-def _receive(queue_url: str) -> dict[str, Any] | None:
+def _receive(queue_url: str) -> MessageTypeDef | None:
     client = _get_client()
     response = client.receive_message(
         QueueUrl=queue_url,
         MaxNumberOfMessages=1,
         WaitTimeSeconds=20,
     )
-    messages: list[dict[str, Any]] = response.get("Messages", [])
+    messages = response.get("Messages", [])
     return messages[0] if messages else None
 
 

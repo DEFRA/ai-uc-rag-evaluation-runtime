@@ -3,13 +3,14 @@ import json
 from logging import getLogger
 
 import boto3
+from mypy_boto3_sqs import SQSClient
 
 import app.config as config
 
 logger = getLogger(__name__)
 
 
-def _get_client() -> object:
+def _get_client() -> SQSClient:
     return boto3.client(
         "sqs",
         region_name=config.config.aws_region,
@@ -25,7 +26,7 @@ async def enqueue_evaluation(run_id: str) -> None:
 
     def _send() -> None:
         client = _get_client()
-        client.send_message(  # type: ignore[attr-defined]
+        client.send_message(
             QueueUrl=queue_url,
             MessageBody=json.dumps({"run_id": run_id}),
             MessageGroupId="run_evaluation",
