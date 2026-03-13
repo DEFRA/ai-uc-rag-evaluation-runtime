@@ -59,8 +59,8 @@ class AppConfig(BaseSettings):
     enable_metrics: bool = False
     tracing_header: str = "x-cdp-request-id"
     evaluation_data_service_url: HttpUrl | None = None
-    rag_evaluation_start_queue_url: str | None = Field(
-        None, alias="RAG_EVALUATION_START_QUEUE_URL"
+    rag_evaluation_start_queue_url: str = Field(
+        ..., alias="RAG_EVALUATION_START_QUEUE_URL"
     )
     llm_as_a_judge_config: LlmAsAJudgeConfig = Field(
         default_factory=lambda: LlmAsAJudgeConfig()

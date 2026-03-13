@@ -7,11 +7,11 @@ from pydantic_ai.models.bedrock import BedrockConverseModel, BedrockModelSetting
 from pydantic_ai.providers.bedrock import BedrockProvider
 
 import app.config as config
-import app.evaluation.rag_answer_service as rag_answer_service
+from app.evaluation.models import EvaluationResult
 
 logger = getLogger(__name__)
 
-_rubric = """
+DEFAULT_RUBRIC = """
 You are evaluating whether an answer correctly and completely addresses a question based on an expected answer.
 
 Score the answer from 0 to 1 using these criteria:
@@ -38,12 +38,20 @@ _settings = (
     else None
 )
 
-_model: models.Model = BedrockConverseModel(
-    _judge_config.inference_profile_arn or _judge_config.model_id,
-    provider=_provider,
-    profile=_provider.model_profile(_judge_config.model_id),
-    settings=_settings,
-)
+
+def _build_configured_models() -> dict[str, models.Model]:
+    return {
+        key: BedrockConverseModel(
+            entry["arn"] or entry["model_id"],
+            provider=_provider,
+            profile=_provider.model_profile(entry["model_id"]),
+            settings=_settings,
+        )
+        for key, entry in config.config.llm_as_a_judge_config.models.items()
+    }
+
+
+_models = _build_configured_models()
 
 
 def _make_judge(
@@ -62,61 +70,18 @@ def _make_judge(
     )
 
 
-def _build_model_from_key(key: str) -> models.Model:
-    entry = config.config.llm_as_a_judge_config.models.get(key)
-    if not entry:
-        msg = f"Model key '{key}' not found in LlmConfig.models"
-        raise ValueError(msg)
-    return BedrockConverseModel(
-        entry["arn"] or entry["model_id"],
-        provider=_provider,
-        profile=_provider.model_profile(entry["model_id"]),
-        settings=_settings,
-    )
-
-
-async def run_rag_evaluation(
-    group_id: str,
-    query: str,
-    expected_answer: str,
-    max_results: int = 5,
-    snapshot_id: str | None = None,
-    rubrics: list[str] | None = None,
-    judge_model_keys: list[str] | None = None,
-) -> list[dict]:
-    answer = await rag_answer_service.answer_with_rag(
-        query, group_id, max_results, snapshot_id
-    )
-    effective_rubrics: list[str] = rubrics if rubrics is not None else [_rubric]
-    model_entries: list[tuple[str, models.Model]] = (
-        [(key, _build_model_from_key(key)) for key in judge_model_keys]
-        if judge_model_keys
-        else [(_judge_config.model_id, _model)]
-    )
-    results = [
-        await evaluate_pydantic(
-            query, expected_answer, answer, rubric, model_key, judge_model
-        )
-        for rubric in effective_rubrics
-        for model_key, judge_model in model_entries
-    ]
-    logger.info(
-        "RAG evaluation complete for group %s: %d result(s)", group_id, len(results)
-    )
-    return results
-
-
 async def evaluate_pydantic(
     question: str,
     expected_answer: str,
     actual_answer: str,
-    rubric: str | None = None,
-    model_key: str | None = None,
-    judge_model: models.Model | None = None,
-) -> dict:
-    effective_rubric = rubric if rubric is not None else _rubric
-    effective_model = judge_model if judge_model is not None else _model
-    judge = _make_judge(effective_rubric, effective_model)
+    model_key: str,
+    rubric: str,
+) -> EvaluationResult:
+    if model_key not in _models:
+        msg = f"No model configured for '{model_key}'"
+        raise ValueError(msg)
+    model = _models[model_key]
+    judge = _make_judge(rubric, model)
     dataset = pydantic_evals.Dataset(
         cases=[pydantic_evals.Case(inputs=question, expected_output=expected_answer)],
         evaluators=[judge],
@@ -132,12 +97,12 @@ async def evaluate_pydantic(
 
     score = score_entry.value if score_entry else None
     reason = case_result.assertions.get("LLMJudge_pass")
-    return {
-        "question": question,
-        "expected_answer": expected_answer,
-        "actual_answer": actual_answer,
-        "model": model_key if model_key is not None else _judge_config.model_id,
-        "rubric": effective_rubric,
-        "score": score,
-        "reason": reason.reason if reason else "",
-    }
+    return EvaluationResult(
+        question=question,
+        expected_answer=expected_answer,
+        actual_answer=actual_answer,
+        model=model_key or _judge_config.model_id,
+        rubric=rubric,
+        score=score,
+        reason=reason.reason if reason else "",
+    )

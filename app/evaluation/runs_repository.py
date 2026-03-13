@@ -3,6 +3,7 @@ from typing import Any
 
 from app.common.mongo import get_mongo_client
 from app.config import config
+from app.evaluation.models import EvaluationResult, EvaluationRun
 
 COLLECTION = "evaluation_runs"
 
@@ -13,26 +14,9 @@ async def _collection() -> Any:
     return db[COLLECTION]
 
 
-async def create_run(
-    run_id: str,
-    group_id: str,
-    queries: list[dict],
-    snapshot_id: str | None,
-    rubrics: list[str] | None,
-    models: list[str] | None,
-) -> None:
+async def create_run(run: EvaluationRun) -> None:
     col = await _collection()
-    await col.insert_one(
-        {
-            "run_id": run_id,
-            "status": "accepted",
-            "group_id": group_id,
-            "queries": queries,
-            "snapshot_id": snapshot_id,
-            "rubrics": rubrics,
-            "models": models,
-        }
-    )
+    await col.insert_one(run.model_dump())
 
 
 async def update_status(run_id: str, status: str) -> None:
@@ -40,9 +24,11 @@ async def update_status(run_id: str, status: str) -> None:
     await col.update_one({"run_id": run_id}, {"$set": {"status": status}})
 
 
-async def append_result(run_id: str, result: dict) -> None:
+async def append_result(run_id: str, result: EvaluationResult) -> None:
     col = await _collection()
-    await col.update_one({"run_id": run_id}, {"$push": {"results": result}})
+    await col.update_one(
+        {"run_id": run_id}, {"$push": {"results": result.model_dump()}}
+    )
 
 
 async def list_runs() -> list[dict[str, Any]]:
@@ -51,10 +37,10 @@ async def list_runs() -> list[dict[str, Any]]:
     return list(await cursor.to_list())
 
 
-async def get_run(run_id: str) -> dict[str, Any] | None:
+async def get_run(run_id: str) -> EvaluationRun | None:
     col = await _collection()
-    result: dict[str, Any] | None = await col.find_one({"run_id": run_id}, {"_id": 0})
-    return result
+    doc = await col.find_one({"run_id": run_id}, {"_id": 0})
+    return EvaluationRun.model_validate(doc) if doc else None
 
 
 def new_run_id() -> str:

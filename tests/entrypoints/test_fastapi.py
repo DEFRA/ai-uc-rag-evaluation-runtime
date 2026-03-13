@@ -1,10 +1,10 @@
 from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 
-import app.evaluation.rag_answer_service as rag_answer_service
 import app.evaluation.runs_repository as runs_repository
 import app.evaluation.sqs_service as sqs_service
 from app.entrypoints.fastapi import app
+from app.evaluation.models import EvaluationRun
 
 client = TestClient(app)
 
@@ -37,136 +37,6 @@ def test_root() -> None:
     assert response.status_code == 404
 
 
-def test_rag_answer_success(mocker: MockerFixture) -> None:
-    mocker.patch(
-        "app.evaluation.rag_service.config.config.evaluation_data_service_url",
-        "http://data-service.example/",
-    )
-    mock_response = mocker.MagicMock()
-    mock_response.status_code = 200
-    mock_response.content = b'[{"content": "Paris is the capital of France."}]'
-    mock_response.json = mocker.MagicMock(
-        return_value=[{"content": "Paris is the capital of France."}]
-    )
-
-    mock_client = mocker.MagicMock()
-    mock_client.post = mocker.AsyncMock(return_value=mock_response)
-    mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = mocker.AsyncMock(return_value=None)
-
-    mocker.patch(
-        "app.evaluation.rag_service.http_client.create_async_client",
-        return_value=mock_client,
-    )
-
-    mock_result = mocker.MagicMock()
-    mock_result.output = "The capital of France is Paris."
-    mocker.patch.object(
-        rag_answer_service._agent,
-        "run",
-        new=mocker.AsyncMock(return_value=mock_result),
-    )
-
-    response = client.get(
-        "/rag/answer",
-        params={
-            "group_id": "g1",
-            "query": "What is the capital of France?",
-            "max_results": 3,
-        },
-    )
-
-    assert response.status_code == 200
-    assert response.json() == {"answer": "The capital of France is Paris."}
-    call_kwargs = mock_client.post.call_args[1]
-    assert call_kwargs["json"] == {
-        "groupId": "g1",
-        "query": "What is the capital of France?",
-        "maxResults": 3,
-    }
-
-
-def test_rag_answer_upstream_error(mocker: MockerFixture) -> None:
-    mocker.patch(
-        "app.evaluation.rag_service.config.config.evaluation_data_service_url",
-        "http://data-service.example/",
-    )
-    mock_response = mocker.MagicMock()
-    mock_response.status_code = 400
-    mock_response.content = b'{"detail": "Knowledge group not found"}'
-    mock_response.json = mocker.MagicMock(
-        return_value={"detail": "Knowledge group not found"}
-    )
-    mock_response.text = "Knowledge group not found"
-
-    mock_client = mocker.MagicMock()
-    mock_client.post = mocker.AsyncMock(return_value=mock_response)
-    mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = mocker.AsyncMock(return_value=None)
-
-    mocker.patch(
-        "app.evaluation.rag_service.http_client.create_async_client",
-        return_value=mock_client,
-    )
-
-    response = client.get(
-        "/rag/answer",
-        params={"group_id": "g1", "query": "What is the capital of France?"},
-    )
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == {"detail": "Knowledge group not found"}
-
-
-def test_evaluation_rag_not_configured(mocker: MockerFixture) -> None:
-    mocker.patch(
-        "app.evaluation.rag_service.config.config.evaluation_data_service_url",
-        None,
-    )
-
-    response = client.get(
-        "/evaluation/rag",
-        params={"group_id": "g1", "query": "test query", "expected_answer": "expected"},
-    )
-
-    assert response.status_code == 503
-    assert "detail" in response.json()
-
-
-def test_evaluation_rag_success(mocker: MockerFixture) -> None:
-    mocker.patch(
-        "app.evaluation.router.evaluation_service.run_rag_evaluation",
-        new=mocker.AsyncMock(
-            return_value=[
-                {
-                    "method": "Pydantic",
-                    "score": 0.91,
-                    "reason": "match",
-                    "passed": True,
-                }
-            ]
-        ),
-    )
-
-    response = client.get(
-        "/evaluation/rag",
-        params={
-            "group_id": "g1",
-            "query": "test query",
-            "expected_answer": "expected answer",
-            "max_results": 3,
-        },
-    )
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "method": "Pydantic",
-        "score": 0.91,
-        "reason": "match",
-        "passed": True,
-    }
-
-
 def test_queue_evaluation_success(mocker: MockerFixture) -> None:
     mocker.patch.object(runs_repository, "new_run_id", return_value="test-run-id")
     mocker.patch.object(
@@ -182,15 +52,23 @@ def test_queue_evaluation_success(mocker: MockerFixture) -> None:
     ]
 
     response = client.post(
-        "/evaluation/queue",
-        json={"group_id": "g1", "queries": queries},
+        "/evaluation",
+        json={
+            "group_id": "g1",
+            "queries": queries,
+            "models": ["sonnet"],
+            "snapshot_id": "snap-1",
+        },
     )
 
     assert response.status_code == 202
-    assert response.json() == {"run_id": "test-run-id", "status": "accepted"}
-    runs_repository.create_run.assert_awaited_once_with(  # type: ignore[attr-defined]
-        "test-run-id", "g1", queries, None, None, None
-    )
+    assert response.json()["run_id"] == "test-run-id"
+    assert response.json()["status"] == "accepted"
+    call_args = runs_repository.create_run.call_args  # type: ignore[attr-defined]
+    run = call_args.args[0]
+    assert run.run_id == "test-run-id"
+    assert run.group_id == "g1"
+    assert [q.model_dump() for q in run.queries] == queries
     sqs_service.enqueue_evaluation.assert_awaited_once_with(  # type: ignore[attr-defined]
         "test-run-id"
     )
@@ -208,7 +86,7 @@ def test_list_runs(mocker: MockerFixture) -> None:
         ),
     )
 
-    response = client.get("/evaluation/runs")
+    response = client.get("/evaluation")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -216,36 +94,37 @@ def test_list_runs(mocker: MockerFixture) -> None:
             {
                 "run_id": "run-1",
                 "status": "completed",
-                "results_url": "/evaluation/runs/run-1/results",
+                "results_url": "/evaluation/run-1",
             },
             {
                 "run_id": "run-2",
                 "status": "in_progress",
-                "results_url": "/evaluation/runs/run-2/results",
+                "results_url": "/evaluation/run-2",
             },
         ]
     }
 
 
 def test_get_run_results(mocker: MockerFixture) -> None:
+    run = EvaluationRun(
+        run_id="run-1",
+        status="completed",
+        group_id="g1",
+        queries=[],
+        snapshot_id="snapshot-id",
+        models=["model1"],
+    )
     mocker.patch.object(
         runs_repository,
         "get_run",
-        new=mocker.AsyncMock(
-            return_value={
-                "run_id": "run-1",
-                "status": "completed",
-                "group_id": "g1",
-                "result": {"results": [{"score": 0.9}]},
-            }
-        ),
+        new=mocker.AsyncMock(return_value=run),
     )
 
-    response = client.get("/evaluation/runs/run-1/results")
+    response = client.get("/evaluation/run-1")
 
     assert response.status_code == 200
     assert response.json()["run_id"] == "run-1"
-    assert response.json()["result"]["results"] == [{"score": 0.9}]
+    assert response.json()["status"] == "completed"
 
 
 def test_get_run_results_not_found(mocker: MockerFixture) -> None:
@@ -274,37 +153,14 @@ def test_queue_evaluation_not_configured(mocker: MockerFixture) -> None:
     )
 
     response = client.post(
-        "/evaluation/queue",
+        "/evaluation",
         json={
             "group_id": "g1",
             "queries": [{"query": "q", "expected_answer": "a"}],
+            "models": ["sonnet"],
+            "snapshot_id": "snap-1",
         },
     )
 
     assert response.status_code == 503
     assert "RAG_EVALUATION_START_QUEUE_URL" in response.json()["detail"]
-
-
-def test_evaluation_rag_upstream_error(mocker: MockerFixture) -> None:
-    from app.evaluation.exceptions import EvaluationDataServiceError
-
-    mocker.patch(
-        "app.evaluation.router.evaluation_service.run_rag_evaluation",
-        new=mocker.AsyncMock(
-            side_effect=EvaluationDataServiceError(
-                400, {"detail": "Knowledge group not found"}
-            )
-        ),
-    )
-
-    response = client.get(
-        "/evaluation/rag",
-        params={
-            "group_id": "g1",
-            "query": "test query",
-            "expected_answer": "expected answer",
-        },
-    )
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == {"detail": "Knowledge group not found"}
