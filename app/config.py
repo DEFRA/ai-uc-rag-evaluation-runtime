@@ -1,4 +1,6 @@
-from pydantic import Field, HttpUrl
+import os
+
+from pydantic import Field, HttpUrl, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +18,22 @@ class LlmAsAJudgeConfig(BaseSettings):
     guardrails_version: str | None = Field(
         None, alias="LLM_AS_A_JUDGE_GUARDRAILS_VERSION"
     )
+    models: dict[str, dict[str, str]] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def build_models(cls, values: dict) -> dict:
+        models: dict[str, dict[str, str]] = {}
+        for key, value in os.environ.items():
+            if key.startswith("LLM_AS_A_JUDGE_MODEL_ID_"):
+                name = key[len("LLM_AS_A_JUDGE_MODEL_ID_") :].lower()
+                arn = os.environ.get(
+                    f"LLM_AS_A_JUDGE_INFERENCE_PROFILE_ARN_{name.upper()}", ""
+                )
+                models[name] = {"model_id": value, "arn": arn}
+        if models:
+            values["models"] = models
+        return values
 
 
 class LlmConfig(BaseSettings):

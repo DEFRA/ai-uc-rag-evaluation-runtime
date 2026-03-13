@@ -22,6 +22,7 @@ class QueueEvaluationRequest(BaseModel):
     queries: list[EvaluationItem]
     snapshot_id: str | None = None
     rubrics: list[str] | None = None
+    models: list[str] | None = None
 
 
 @router.get("/evaluation/rag")
@@ -53,6 +54,7 @@ async def queue_evaluation(request: QueueEvaluationRequest) -> JSONResponse:
         queries,
         request.snapshot_id,
         request.rubrics,
+        request.models,
     )
     await sqs_service.enqueue_evaluation(
         run_id,
@@ -60,6 +62,7 @@ async def queue_evaluation(request: QueueEvaluationRequest) -> JSONResponse:
         queries,
         request.snapshot_id,
         request.rubrics,
+        request.models,
     )
     return JSONResponse(
         status_code=202,

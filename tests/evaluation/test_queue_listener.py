@@ -68,10 +68,20 @@ async def test_listen_logs_received_messages(mocker: MockerFixture) -> None:
     mock_update_status.assert_any_await("run-1", "in_progress")
     assert mock_run.await_count == 2
     mock_run.assert_any_await(
-        "group1", "question 1", "answer 1", snapshot_id=None, rubrics=None
+        "group1",
+        "question 1",
+        "answer 1",
+        snapshot_id=None,
+        rubrics=None,
+        judge_model_keys=None,
     )
     mock_run.assert_any_await(
-        "group1", "question 2", "answer 2", snapshot_id=None, rubrics=None
+        "group1",
+        "question 2",
+        "answer 2",
+        snapshot_id=None,
+        rubrics=None,
+        judge_model_keys=None,
     )
     mock_update_status.assert_any_await(
         "run-1", "completed", {"results": [{"score": 1.0}, {"score": 1.0}]}

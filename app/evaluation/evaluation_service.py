@@ -46,9 +46,11 @@ _model: models.Model = BedrockConverseModel(
 )
 
 
-def _make_judge(rubric: str) -> pydantic_evals.evaluators.LLMJudge:
+def _make_judge(
+    rubric: str, judge_model: models.Model
+) -> pydantic_evals.evaluators.LLMJudge:
     return pydantic_evals.evaluators.LLMJudge(
-        model=_model,
+        model=judge_model,
         rubric=rubric,
         score={"evaluation_name": "AnswerMatcher"},
         model_settings={
@@ -60,6 +62,19 @@ def _make_judge(rubric: str) -> pydantic_evals.evaluators.LLMJudge:
     )
 
 
+def _build_model_from_key(key: str) -> models.Model:
+    entry = config.config.llm_as_a_judge_config.models.get(key)
+    if not entry:
+        msg = f"Model key '{key}' not found in LlmConfig.models"
+        raise ValueError(msg)
+    return BedrockConverseModel(
+        entry["arn"] or entry["model_id"],
+        provider=_provider,
+        profile=_provider.model_profile(entry["model_id"]),
+        settings=_settings,
+    )
+
+
 async def run_rag_evaluation(
     group_id: str,
     query: str,
@@ -67,16 +82,24 @@ async def run_rag_evaluation(
     max_results: int = 5,
     snapshot_id: str | None = None,
     rubrics: list[str] | None = None,
+    judge_model_keys: list[str] | None = None,
 ) -> list[dict]:
     answer = await rag_answer_service.answer_with_rag(
         query, group_id, max_results, snapshot_id
     )
     effective_rubrics: list[str] = rubrics if rubrics is not None else [_rubric]
+    model_entries: list[tuple[str, models.Model]] = (
+        [(key, _build_model_from_key(key)) for key in judge_model_keys]
+        if judge_model_keys
+        else [(_judge_config.model_id, _model)]
+    )
     results = [
-        await evaluate_pydantic(query, expected_answer, answer, rubric)
+        await evaluate_pydantic(
+            query, expected_answer, answer, rubric, model_key, judge_model
+        )
         for rubric in effective_rubrics
+        for model_key, judge_model in model_entries
     ]
-
     logger.info(
         "RAG evaluation complete for group %s: %d result(s)", group_id, len(results)
     )
@@ -88,8 +111,12 @@ async def evaluate_pydantic(
     expected_answer: str,
     actual_answer: str,
     rubric: str | None = None,
+    model_key: str | None = None,
+    judge_model: models.Model | None = None,
 ) -> dict:
-    judge = _make_judge(rubric if rubric is not None else _rubric)
+    effective_rubric = rubric if rubric is not None else _rubric
+    effective_model = judge_model if judge_model is not None else _model
+    judge = _make_judge(effective_rubric, effective_model)
     dataset = pydantic_evals.Dataset(
         cases=[pydantic_evals.Case(inputs=question, expected_output=expected_answer)],
         evaluators=[judge],
@@ -107,7 +134,8 @@ async def evaluate_pydantic(
     reason = case_result.assertions.get("LLMJudge_pass")
     return {
         "method": "Pydantic",
-        "rubric": rubric if rubric is not None else _rubric,
+        "model": model_key if model_key is not None else _judge_config.model_id,
+        "rubric": effective_rubric,
         "score": score,
         "reason": reason.reason if reason else "",
         "passed": score >= _judge_config.threshold if score else -1,

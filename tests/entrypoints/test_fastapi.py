@@ -189,10 +189,10 @@ def test_queue_evaluation_success(mocker: MockerFixture) -> None:
     assert response.status_code == 202
     assert response.json() == {"run_id": "test-run-id", "status": "accepted"}
     runs_repository.create_run.assert_awaited_once_with(  # type: ignore[attr-defined]
-        "test-run-id", "g1", queries, None, None
+        "test-run-id", "g1", queries, None, None, None
     )
     sqs_service.enqueue_evaluation.assert_awaited_once_with(  # type: ignore[attr-defined]
-        "test-run-id", "g1", queries, None, None
+        "test-run-id", "g1", queries, None, None, None
     )
 
 

@@ -55,6 +55,7 @@ async def listen() -> None:
             logger.info("Received evaluation request: %s", run_id)
             await runs_repository.update_status(run_id, "in_progress")
             rubrics: list[str] | None = body.get("rubrics") or None
+            judge_model_keys: list[str] | None = body.get("models") or None
             results = []
             for item in body["queries"]:
                 item_results = await evaluation_service.run_rag_evaluation(
@@ -63,6 +64,7 @@ async def listen() -> None:
                     item["expected_answer"],
                     snapshot_id=body.get("snapshot_id"),
                     rubrics=rubrics,
+                    judge_model_keys=judge_model_keys,
                 )
                 results.extend(item_results)
             await runs_repository.update_status(
