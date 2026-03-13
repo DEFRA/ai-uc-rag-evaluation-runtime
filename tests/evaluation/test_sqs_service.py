@@ -3,7 +3,7 @@ import json
 import pytest
 from pytest_mock import MockerFixture
 
-import app.evaluation.sqs_service as sqs_service
+from app.evaluation import sqs_service
 
 
 async def test_enqueue_evaluation_sends_message(mocker: MockerFixture) -> None:

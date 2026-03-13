@@ -1,9 +1,8 @@
 from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 
-import app.evaluation.evaluation_service as evaluation_service
-import app.evaluation.runs_repository as runs_repository
 from app.entrypoints.fastapi import app
+from app.evaluation import evaluation_service, runs_repository
 from app.evaluation.models import EvaluationQuery, EvaluationRun
 
 client = TestClient(app)

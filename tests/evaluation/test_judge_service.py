@@ -1,7 +1,7 @@
 import pytest
 from pytest_mock import MockerFixture
 
-import app.evaluation.judge_service as judge_service
+from app.evaluation import judge_service
 
 _MODEL_KEY = "test-model"
 

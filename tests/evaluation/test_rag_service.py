@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
-import app.evaluation.rag_service as rag_service
+from app.evaluation import rag_service
 from app.evaluation.exceptions import (
     EvaluationDataServiceError,
     EvaluationDataServiceNotConfiguredError,

@@ -1,6 +1,6 @@
 from pytest_mock import MockerFixture
 
-import app.evaluation.rag_answer_service as rag_answer_service
+from app.evaluation import rag_answer_service
 
 
 async def test_answer_with_rag_formats_context_and_returns_output(

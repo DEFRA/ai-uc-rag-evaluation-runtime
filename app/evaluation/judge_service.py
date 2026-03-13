@@ -6,7 +6,7 @@ from pydantic_ai import models
 from pydantic_ai.models.bedrock import BedrockConverseModel, BedrockModelSettings
 from pydantic_ai.providers.bedrock import BedrockProvider
 
-import app.config as config
+from app import config
 from app.evaluation.models import EvaluationResult
 
 logger = getLogger(__name__)

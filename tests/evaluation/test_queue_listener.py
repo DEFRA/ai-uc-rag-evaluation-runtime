@@ -4,10 +4,8 @@ import json
 
 from pytest_mock import MockerFixture
 
-import app.evaluation.judge_service as evaluation_service
-import app.evaluation.queue_listener as queue_listener
-import app.evaluation.rag_answer_service as rag_answer_service
-import app.evaluation.runs_repository as runs_repository
+from app.evaluation import judge_service as evaluation_service
+from app.evaluation import queue_listener, rag_answer_service, runs_repository
 from app.evaluation.models import EvaluationQuery, EvaluationResult, EvaluationRun
 
 

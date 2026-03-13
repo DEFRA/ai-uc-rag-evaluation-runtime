@@ -4,8 +4,8 @@ from pydantic_ai import Agent, models
 from pydantic_ai.models.bedrock import BedrockConverseModel, BedrockModelSettings
 from pydantic_ai.providers.bedrock import BedrockProvider
 
-import app.config as config
-import app.evaluation.rag_service as rag_service
+from app import config
+from app.evaluation import rag_service
 
 logger = getLogger(__name__)
 

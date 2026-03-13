@@ -1,8 +1,6 @@
 from pytest_mock import MockerFixture
 
-import app.evaluation.evaluation_service as evaluation_service
-import app.evaluation.runs_repository as runs_repository
-import app.evaluation.sqs_service as sqs_service
+from app.evaluation import evaluation_service, runs_repository, sqs_service
 from app.evaluation.models import EvaluationQuery
 
 

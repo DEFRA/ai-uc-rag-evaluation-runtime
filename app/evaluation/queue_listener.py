@@ -7,10 +7,8 @@ import boto3
 from mypy_boto3_sqs import SQSClient
 from mypy_boto3_sqs.type_defs import MessageTypeDef
 
-import app.config as config
-import app.evaluation.judge_service as judge_service
-import app.evaluation.rag_answer_service as rag_answer_service
-import app.evaluation.runs_repository as runs_repository
+from app import config
+from app.evaluation import judge_service, rag_answer_service, runs_repository
 from app.evaluation.models import EvaluationRun
 
 logger = getLogger(__name__)

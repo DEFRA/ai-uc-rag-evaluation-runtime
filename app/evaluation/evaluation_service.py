@@ -1,7 +1,6 @@
 import uuid
 
-import app.evaluation.runs_repository as runs_repository
-import app.evaluation.sqs_service as sqs_service
+from app.evaluation import runs_repository, sqs_service
 from app.evaluation.models import EvaluationQuery, EvaluationRun
 
 

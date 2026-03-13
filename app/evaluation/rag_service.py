@@ -1,8 +1,8 @@
 from logging import getLogger
 from typing import Any, cast
 
-import app.common.http_client as http_client
-import app.config as config
+from app import config
+from app.common import http_client
 from app.evaluation.exceptions import (
     EvaluationDataServiceError,
     EvaluationDataServiceNotConfiguredError,

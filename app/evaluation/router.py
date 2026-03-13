@@ -2,8 +2,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-import app.evaluation.evaluation_service as evaluation_service
-import app.evaluation.runs_repository as runs_repository
+from app.evaluation import evaluation_service, runs_repository
 from app.evaluation.models import EvaluationQuery
 
 router = APIRouter(tags=["evaluation"])

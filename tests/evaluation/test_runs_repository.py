@@ -2,7 +2,7 @@ from typing import Any
 
 from pytest_mock import MockerFixture
 
-import app.evaluation.runs_repository as runs_repository
+from app.evaluation import runs_repository
 from app.evaluation.models import EvaluationQuery, EvaluationResult, EvaluationRun
 
 
