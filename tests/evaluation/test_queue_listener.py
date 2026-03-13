@@ -92,6 +92,83 @@ async def test_listen_processes_queries(mocker: MockerFixture) -> None:
     mock_update_status.assert_any_await("run-1", "completed")
 
 
+async def test_listen_skips_run_not_found_in_mongo(mocker: MockerFixture) -> None:
+    mocker.patch(
+        "app.evaluation.queue_listener.config.config.rag_evaluation_start_queue_url",
+        "http://localhost:4566/000000000000/rag_evaluation_start.fifo",
+    )
+
+    call_count = 0
+
+    def fake_receive(_queue_url: str) -> dict | None:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return {
+                "Body": json.dumps({"run_id": "missing-run"}),
+                "ReceiptHandle": "h1",
+            }
+        raise asyncio.CancelledError
+
+    mocker.patch(
+        "app.evaluation.queue_listener._receive_message", side_effect=fake_receive
+    )
+    mock_delete = mocker.patch("app.evaluation.queue_listener._delete_message")
+    mocker.patch.object(
+        runs_repository, "get_run", new=mocker.AsyncMock(return_value=None)
+    )
+    mock_update_status = mocker.patch.object(
+        runs_repository, "update_status", new=mocker.AsyncMock(return_value=None)
+    )
+    mock_answer = mocker.patch.object(
+        rag_answer_service,
+        "answer_with_rag",
+        new=mocker.AsyncMock(return_value="the answer"),
+    )
+
+    with contextlib.suppress(asyncio.CancelledError):
+        await queue_listener.listen()
+
+    mock_answer.assert_not_awaited()
+    mock_update_status.assert_not_awaited()
+    mock_delete.assert_called_once()
+
+
+async def test_listen_continues_after_processing_exception(
+    mocker: MockerFixture,
+) -> None:
+    mocker.patch(
+        "app.evaluation.queue_listener.config.config.rag_evaluation_start_queue_url",
+        "http://localhost:4566/000000000000/rag_evaluation_start.fifo",
+    )
+
+    call_count = 0
+
+    def fake_receive(_queue_url: str) -> dict | None:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return {"Body": json.dumps({"run_id": "run-1"}), "ReceiptHandle": "h1"}
+        raise asyncio.CancelledError
+
+    mocker.patch(
+        "app.evaluation.queue_listener._receive_message", side_effect=fake_receive
+    )
+    mocker.patch("app.evaluation.queue_listener._delete_message")
+    mocker.patch.object(
+        runs_repository,
+        "get_run",
+        new=mocker.AsyncMock(side_effect=RuntimeError("db connection failed")),
+    )
+    mocker.patch("app.evaluation.queue_listener.asyncio.sleep", new=mocker.AsyncMock())
+
+    with contextlib.suppress(asyncio.CancelledError):
+        await queue_listener.listen()
+
+    # listener recovered and looped again (second receive raised CancelledError)
+    assert call_count == 2
+
+
 async def test_listen_skips_already_completed_combinations(
     mocker: MockerFixture,
 ) -> None:
