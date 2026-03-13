@@ -57,7 +57,7 @@ async def test_listen_logs_received_messages(mocker: MockerFixture) -> None:
     mock_run = mocker.patch.object(
         evaluation_service,
         "run_rag_evaluation",
-        new=mocker.AsyncMock(return_value={"score": 1.0}),
+        new=mocker.AsyncMock(return_value=[{"score": 1.0}]),
     )
     mock_logger = mocker.patch("app.evaluation.queue_listener.logger")
 
@@ -67,8 +67,12 @@ async def test_listen_logs_received_messages(mocker: MockerFixture) -> None:
     mock_logger.info.assert_any_call("Received evaluation request: %s", "run-1")
     mock_update_status.assert_any_await("run-1", "in_progress")
     assert mock_run.await_count == 2
-    mock_run.assert_any_await("group1", "question 1", "answer 1", snapshot_id=None)
-    mock_run.assert_any_await("group1", "question 2", "answer 2", snapshot_id=None)
+    mock_run.assert_any_await(
+        "group1", "question 1", "answer 1", snapshot_id=None, rubrics=None
+    )
+    mock_run.assert_any_await(
+        "group1", "question 2", "answer 2", snapshot_id=None, rubrics=None
+    )
     mock_update_status.assert_any_await(
         "run-1", "completed", {"results": [{"score": 1.0}, {"score": 1.0}]}
     )

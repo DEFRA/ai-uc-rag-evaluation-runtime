@@ -22,6 +22,7 @@ async def enqueue_evaluation(
     group_id: str,
     queries: list[dict],
     snapshot_id: str | None = None,
+    rubrics: list[str] | None = None,
 ) -> None:
     queue_url = config.config.rag_evaluation_start_queue_url
     if not queue_url:
@@ -33,6 +34,7 @@ async def enqueue_evaluation(
         "group_id": group_id,
         "queries": queries,
         "snapshot_id": snapshot_id,
+        "rubrics": rubrics,
     }
 
     def _send() -> None:

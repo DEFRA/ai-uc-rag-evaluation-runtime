@@ -18,6 +18,7 @@ async def create_run(
     group_id: str,
     queries: list[dict],
     snapshot_id: str | None,
+    rubrics: list[str] | None,
 ) -> None:
     col = await _collection()
     await col.insert_one(
@@ -27,6 +28,7 @@ async def create_run(
             "group_id": group_id,
             "queries": queries,
             "snapshot_id": snapshot_id,
+            "rubrics": rubrics,
         }
     )
 

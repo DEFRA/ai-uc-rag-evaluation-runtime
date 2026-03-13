@@ -45,17 +45,19 @@ _model: models.Model = BedrockConverseModel(
     settings=_settings,
 )
 
-_judge = pydantic_evals.evaluators.LLMJudge(
-    model=_model,
-    rubric=_rubric,
-    score={"evaluation_name": "AnswerMatcher"},
-    model_settings={
-        "temperature": _judge_config.temperature,
-        "max_tokens": _judge_config.max_tokens,
-    },
-    include_input=True,
-    include_expected_output=True,
-)
+
+def _make_judge(rubric: str) -> pydantic_evals.evaluators.LLMJudge:
+    return pydantic_evals.evaluators.LLMJudge(
+        model=_model,
+        rubric=rubric,
+        score={"evaluation_name": "AnswerMatcher"},
+        model_settings={
+            "temperature": _judge_config.temperature,
+            "max_tokens": _judge_config.max_tokens,
+        },
+        include_input=True,
+        include_expected_output=True,
+    )
 
 
 async def run_rag_evaluation(
@@ -64,21 +66,33 @@ async def run_rag_evaluation(
     expected_answer: str,
     max_results: int = 5,
     snapshot_id: str | None = None,
-) -> dict:
+    rubrics: list[str] | None = None,
+) -> list[dict]:
     answer = await rag_answer_service.answer_with_rag(
         query, group_id, max_results, snapshot_id
     )
-    result = await evaluate_pydantic(query, expected_answer, answer)
-    logger.info("RAG evaluation complete for group %s: %s", group_id, result)
-    return result
+    effective_rubrics: list[str] = rubrics if rubrics is not None else [_rubric]
+    results = [
+        await evaluate_pydantic(query, expected_answer, answer, rubric)
+        for rubric in effective_rubrics
+    ]
+
+    logger.info(
+        "RAG evaluation complete for group %s: %d result(s)", group_id, len(results)
+    )
+    return results
 
 
 async def evaluate_pydantic(
-    question: str, expected_answer: str, actual_answer: str
+    question: str,
+    expected_answer: str,
+    actual_answer: str,
+    rubric: str | None = None,
 ) -> dict:
+    judge = _make_judge(rubric if rubric is not None else _rubric)
     dataset = pydantic_evals.Dataset(
         cases=[pydantic_evals.Case(inputs=question, expected_output=expected_answer)],
-        evaluators=[_judge],
+        evaluators=[judge],
     )
 
     report = await dataset.evaluate(lambda _: actual_answer)
@@ -93,6 +107,7 @@ async def evaluate_pydantic(
     reason = case_result.assertions.get("LLMJudge_pass")
     return {
         "method": "Pydantic",
+        "rubric": rubric if rubric is not None else _rubric,
         "score": score,
         "reason": reason.reason if reason else "",
         "passed": score >= _judge_config.threshold if score else -1,

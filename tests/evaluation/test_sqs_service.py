@@ -29,6 +29,7 @@ async def test_enqueue_evaluation_sends_message(mocker: MockerFixture) -> None:
                 "group_id": "group1",
                 "queries": QUERIES,
                 "snapshot_id": None,
+                "rubrics": None,
             }
         ),
         MessageGroupId="group1",

@@ -21,6 +21,7 @@ class QueueEvaluationRequest(BaseModel):
     group_id: str
     queries: list[EvaluationItem]
     snapshot_id: str | None = None
+    rubrics: list[str] | None = None
 
 
 @router.get("/evaluation/rag")
@@ -35,10 +36,10 @@ async def trigger_rag_evaluation(
     """
     Trigger a RAG evaluation by querying the evaluation-data service snapshots endpoint.
     """
-    result = await evaluation_service.run_rag_evaluation(
+    results = await evaluation_service.run_rag_evaluation(
         group_id, query, expected_answer, max_results
     )
-    return JSONResponse(content=result)
+    return JSONResponse(content=results[0])
 
 
 @router.post("/evaluation/queue")
@@ -51,12 +52,14 @@ async def queue_evaluation(request: QueueEvaluationRequest) -> JSONResponse:
         request.group_id,
         queries,
         request.snapshot_id,
+        request.rubrics,
     )
     await sqs_service.enqueue_evaluation(
         run_id,
         request.group_id,
         queries,
         request.snapshot_id,
+        request.rubrics,
     )
     return JSONResponse(
         status_code=202,

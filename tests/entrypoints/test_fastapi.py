@@ -137,12 +137,14 @@ def test_evaluation_rag_success(mocker: MockerFixture) -> None:
     mocker.patch(
         "app.evaluation.router.evaluation_service.run_rag_evaluation",
         new=mocker.AsyncMock(
-            return_value={
-                "method": "Pydantic",
-                "score": 0.91,
-                "reason": "match",
-                "passed": True,
-            }
+            return_value=[
+                {
+                    "method": "Pydantic",
+                    "score": 0.91,
+                    "reason": "match",
+                    "passed": True,
+                }
+            ]
         ),
     )
 
@@ -187,10 +189,10 @@ def test_queue_evaluation_success(mocker: MockerFixture) -> None:
     assert response.status_code == 202
     assert response.json() == {"run_id": "test-run-id", "status": "accepted"}
     runs_repository.create_run.assert_awaited_once_with(  # type: ignore[attr-defined]
-        "test-run-id", "g1", queries, None
+        "test-run-id", "g1", queries, None, None
     )
     sqs_service.enqueue_evaluation.assert_awaited_once_with(  # type: ignore[attr-defined]
-        "test-run-id", "g1", queries, None
+        "test-run-id", "g1", queries, None, None
     )
 
 
