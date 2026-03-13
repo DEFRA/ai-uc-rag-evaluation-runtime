@@ -54,6 +54,9 @@ async def test_listen_logs_received_messages(mocker: MockerFixture) -> None:
     mock_update_status = mocker.patch.object(
         runs_repository, "update_status", new=mocker.AsyncMock(return_value=None)
     )
+    mock_append_result = mocker.patch.object(
+        runs_repository, "append_result", new=mocker.AsyncMock(return_value=None)
+    )
     mock_run = mocker.patch.object(
         evaluation_service,
         "run_rag_evaluation",
@@ -83,6 +86,6 @@ async def test_listen_logs_received_messages(mocker: MockerFixture) -> None:
         rubrics=None,
         judge_model_keys=None,
     )
-    mock_update_status.assert_any_await(
-        "run-1", "completed", {"results": [{"score": 1.0}, {"score": 1.0}]}
-    )
+    assert mock_append_result.await_count == 2
+    mock_append_result.assert_any_await("run-1", {"score": 1.0})
+    mock_update_status.assert_any_await("run-1", "completed")

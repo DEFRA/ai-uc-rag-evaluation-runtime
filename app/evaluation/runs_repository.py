@@ -35,12 +35,14 @@ async def create_run(
     )
 
 
-async def update_status(run_id: str, status: str, result: dict | None = None) -> None:
+async def update_status(run_id: str, status: str) -> None:
     col = await _collection()
-    update: dict[str, Any] = {"$set": {"status": status}}
-    if result is not None:
-        update["$set"]["result"] = result
-    await col.update_one({"run_id": run_id}, update)
+    await col.update_one({"run_id": run_id}, {"$set": {"status": status}})
+
+
+async def append_result(run_id: str, result: dict) -> None:
+    col = await _collection()
+    await col.update_one({"run_id": run_id}, {"$push": {"results": result}})
 
 
 async def list_runs() -> list[dict[str, Any]]:

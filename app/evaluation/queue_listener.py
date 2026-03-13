@@ -56,7 +56,6 @@ async def listen() -> None:
             await runs_repository.update_status(run_id, "in_progress")
             rubrics: list[str] | None = body.get("rubrics") or None
             judge_model_keys: list[str] | None = body.get("models") or None
-            results = []
             for item in body["queries"]:
                 item_results = await evaluation_service.run_rag_evaluation(
                     body["group_id"],
@@ -66,10 +65,9 @@ async def listen() -> None:
                     rubrics=rubrics,
                     judge_model_keys=judge_model_keys,
                 )
-                results.extend(item_results)
-            await runs_repository.update_status(
-                run_id, "completed", {"results": results}
-            )
+                for result in item_results:
+                    await runs_repository.append_result(run_id, result)
+            await runs_repository.update_status(run_id, "completed")
             await asyncio.to_thread(_delete, queue_url, msg["ReceiptHandle"])
         except asyncio.CancelledError:
             logger.info("Queue listener cancelled")
