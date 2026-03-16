@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class EvaluationQuery(BaseModel):
@@ -24,4 +24,4 @@ class EvaluationRun(BaseModel):
     snapshot_id: str
     rubrics: list[str] | None = None
     models: list[str]
-    results: list[EvaluationResult] = []
+    results: list[EvaluationResult] = Field(default_factory=list)

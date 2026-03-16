@@ -101,7 +101,7 @@ async def evaluate_with_judge(
         question=question,
         expected_answer=expected_answer,
         actual_answer=actual_answer,
-        model=model_key or _judge_config.model_id,
+        model=model_key,
         rubric=rubric,
         score=score,
         reason=reason.reason if reason else "",

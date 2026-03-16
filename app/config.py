@@ -6,10 +6,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class LlmAsAJudgeConfig(BaseSettings):
     model_config = SettingsConfigDict()
-    model_id: str = Field(..., alias="LLM_AS_A_JUDGE_MODEL_ID")
-    inference_profile_arn: str | None = Field(
-        None, alias="LLM_AS_A_JUDGE_INFERENCE_PROFILE_ARN"
-    )
     temperature: float = Field(0, alias="LLM_AS_A_JUDGE_TEMPERATURE")
     n_prompts: int = Field(10, alias="LLM_AS_A_JUDGE_N_PROMPTS")
     max_tokens: int = Field(2048, alias="LLM_AS_A_JUDGE_MAX_TOKENS")

@@ -12,7 +12,7 @@ async def test_enqueue_evaluation_sends_message(mocker: MockerFixture) -> None:
         "http://localhost:4566/000000000000/rag_evaluation_start.fifo",
     )
     mock_client = mocker.MagicMock()
-    mocker.patch("app.evaluation.sqs_service.boto3.client", return_value=mock_client)
+    mocker.patch.object(sqs_service, "_client", mock_client)
 
     await sqs_service.enqueue_evaluation("run-1")
 
