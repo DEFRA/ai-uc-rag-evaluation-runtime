@@ -16,11 +16,14 @@ async def test_enqueue_evaluation_sends_message(mocker: MockerFixture) -> None:
 
     await sqs_service.enqueue_evaluation("run-1")
 
-    mock_client.send_message.assert_called_once_with(
-        QueueUrl="http://localhost:4566/000000000000/rag_evaluation_start.fifo",
-        MessageBody=json.dumps({"run_id": "run-1"}),
-        MessageGroupId="run_evaluation",
+    call_kwargs = mock_client.send_message.call_args.kwargs
+    assert (
+        call_kwargs["QueueUrl"]
+        == "http://localhost:4566/000000000000/rag_evaluation_start.fifo"
     )
+    assert call_kwargs["MessageBody"] == json.dumps({"run_id": "run-1"})
+    assert call_kwargs["MessageGroupId"] == "run_evaluation"
+    assert call_kwargs["MessageDeduplicationId"].startswith("run-1-")
 
 
 async def test_enqueue_evaluation_raises_when_not_configured(

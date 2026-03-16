@@ -1,5 +1,6 @@
 import asyncio
 import json
+import uuid
 from logging import getLogger
 
 import boto3
@@ -32,6 +33,7 @@ async def enqueue_evaluation(run_id: str) -> None:
             QueueUrl=queue_url,
             MessageBody=json.dumps({"run_id": run_id}),
             MessageGroupId="run_evaluation",
+            MessageDeduplicationId=f"{run_id}-{uuid.uuid4()}",
         )
 
     await asyncio.to_thread(_send)
