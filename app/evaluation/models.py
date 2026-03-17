@@ -16,6 +16,13 @@ class EvaluationResult(BaseModel):
     reason: str
 
 
+class EvaluationSummary(BaseModel):
+    model: str
+    rubric: str
+    average_score: float
+    passed: bool
+
+
 class EvaluationRun(BaseModel):
     run_id: str
     status: str
@@ -25,3 +32,4 @@ class EvaluationRun(BaseModel):
     rubrics: list[str] | None = None
     models: list[str]
     results: list[EvaluationResult] = Field(default_factory=list)
+    evaluation_summary: list[EvaluationSummary] = Field(default_factory=list)

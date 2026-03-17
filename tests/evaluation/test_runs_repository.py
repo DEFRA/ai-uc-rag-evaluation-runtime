@@ -2,23 +2,22 @@ from typing import Any
 
 from pytest_mock import MockerFixture
 
-from app.evaluation import runs_repository
-from app.evaluation.models import EvaluationQuery, EvaluationResult, EvaluationRun
+from app.evaluation import models, runs_repository
 
 
-def _make_run(**kwargs: object) -> EvaluationRun:
+def _make_run(**kwargs: object) -> models.EvaluationRun:
     defaults: dict = {
         "run_id": "run-1",
         "status": "accepted",
         "group_id": "group-1",
-        "queries": [EvaluationQuery(query="q1", expected_answer="a1")],
+        "queries": [models.EvaluationQuery(query="q1", expected_answer="a1")],
         "snapshot_id": "snap-1",
         "models": ["model1"],
     }
-    return EvaluationRun(**{**defaults, **kwargs})
+    return models.EvaluationRun(**{**defaults, **kwargs})
 
 
-def _make_result(**kwargs: object) -> EvaluationResult:
+def _make_result(**kwargs: object) -> models.EvaluationResult:
     defaults: dict = {
         "question": "q1",
         "expected_answer": "a1",
@@ -28,7 +27,7 @@ def _make_result(**kwargs: object) -> EvaluationResult:
         "score": 0.9,
         "reason": "correct",
     }
-    return EvaluationResult(**{**defaults, **kwargs})
+    return models.EvaluationResult(**{**defaults, **kwargs})
 
 
 async def _mock_collection(mocker: MockerFixture) -> Any:
@@ -67,6 +66,22 @@ async def test_append_result_pushes_result(mocker: MockerFixture) -> None:
 
     col.update_one.assert_awaited_once_with(
         {"run_id": "run-1"}, {"$push": {"results": result.model_dump()}}
+    )
+
+
+async def test_save_summary_sets_summary(mocker: MockerFixture) -> None:
+    col = await _mock_collection(mocker)
+    summary = [
+        models.EvaluationSummary(
+            model="model1", rubric="rubric", average_score=0.8, passed=True
+        )
+    ]
+
+    await runs_repository.save_summary("run-1", summary)
+
+    col.update_one.assert_awaited_once_with(
+        {"run_id": "run-1"},
+        {"$set": {"evaluation_summary": [s.model_dump() for s in summary]}},
     )
 
 
