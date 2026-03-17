@@ -1,79 +1,33 @@
 from pytest_mock import MockerFixture
 
-import app.evaluation.evaluation_service as evaluation_service
+from app.evaluation import evaluation_service, runs_repository, sqs_service
+from app.evaluation.models import EvaluationQuery
 
 
-def _make_report(
-    score: float | None, reason: str | None, mocker: MockerFixture
-) -> object:
-    score_entry = mocker.MagicMock()
-    score_entry.value = score
-
-    assertion = mocker.MagicMock()
-    assertion.reason = reason
-
-    case_result = mocker.MagicMock()
-    case_result.scores = {"AnswerMatcher": score_entry} if score is not None else {}
-    case_result.assertions = {"LLMJudge_pass": assertion} if reason is not None else {}
-
-    report = mocker.MagicMock()
-    report.cases = [case_result]
-    return report
-
-
-async def test_evaluate_pydantic_returns_pass_when_score_above_threshold(
+async def test_create_evaluation_run_persists_and_enqueues(
     mocker: MockerFixture,
 ) -> None:
-    report = _make_report(score=0.9, reason="Answer is correct.", mocker=mocker)
-    mocker.patch(
-        "app.evaluation.evaluation_service.pydantic_evals.Dataset.evaluate",
-        new=mocker.AsyncMock(return_value=report),
+    mock_create_run = mocker.patch.object(
+        runs_repository, "create_run", new=mocker.AsyncMock(return_value=None)
+    )
+    mock_enqueue = mocker.patch.object(
+        sqs_service, "enqueue_evaluation", new=mocker.AsyncMock(return_value=None)
     )
 
-    result = await evaluation_service.evaluate_pydantic(
-        "What is the capital of France?",
-        "Paris",
-        "The capital of France is Paris.",
+    queries = [EvaluationQuery(query="q1", expected_answer="a1")]
+    run = await evaluation_service.create_evaluation_run(
+        group_id="g1",
+        queries=queries,
+        snapshot_id="snap-1",
+        rubrics=["custom rubric"],
+        model_keys=["sonnet"],
     )
 
-    assert result["method"] == "Pydantic"
-    assert result["score"] == 0.9
-    assert result["reason"] == "Answer is correct."
-    assert result["passed"] is True
-
-
-async def test_evaluate_pydantic_returns_fail_when_score_below_threshold(
-    mocker: MockerFixture,
-) -> None:
-    report = _make_report(score=0.2, reason="Answer is mostly wrong.", mocker=mocker)
-    mocker.patch(
-        "app.evaluation.evaluation_service.pydantic_evals.Dataset.evaluate",
-        new=mocker.AsyncMock(return_value=report),
-    )
-
-    result = await evaluation_service.evaluate_pydantic(
-        "What is the capital of France?",
-        "Paris",
-        "The capital of France is Berlin.",
-    )
-
-    assert result["score"] == 0.2
-    assert result["passed"] is False
-
-
-async def test_evaluate_pydantic_handles_missing_score(
-    mocker: MockerFixture,
-) -> None:
-    report = _make_report(score=None, reason=None, mocker=mocker)
-    mocker.patch(
-        "app.evaluation.evaluation_service.pydantic_evals.Dataset.evaluate",
-        new=mocker.AsyncMock(return_value=report),
-    )
-
-    result = await evaluation_service.evaluate_pydantic(
-        "question", "expected", "actual"
-    )
-
-    assert result["score"] is None
-    assert result["reason"] == ""
-    assert result["passed"] == -1
+    assert run.status == "accepted"
+    assert run.group_id == "g1"
+    assert run.queries == queries
+    assert run.snapshot_id == "snap-1"
+    assert run.rubrics == ["custom rubric"]
+    assert run.models == ["sonnet"]
+    mock_create_run.assert_awaited_once_with(run)
+    mock_enqueue.assert_awaited_once_with(run.run_id)

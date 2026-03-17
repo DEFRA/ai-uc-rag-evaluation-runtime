@@ -1,45 +1,47 @@
-from typing import Annotated
-
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
-import app.evaluation.evaluation_service as evaluation_service
-import app.evaluation.rag_answer_service as rag_answer_service
+from app.evaluation import evaluation_service, runs_repository
+from app.evaluation.models import EvaluationQuery
 
 router = APIRouter(tags=["evaluation"])
 
 
-@router.get("/evaluation/rag")
-async def trigger_rag_evaluation(
-    group_id: Annotated[str, Query(..., description="Knowledge group ID")],
-    query: Annotated[str, Query(..., description="Search query")],
-    expected_answer: Annotated[str, Query(..., description="Expected answer")],
-    max_results: Annotated[
-        int, Query(ge=1, le=100, description="Maximum number of results")
-    ] = 5,
-) -> JSONResponse:
-    """
-    Trigger a RAG evaluation by querying the evaluation-data service snapshots endpoint.
-    """
-    answer = await rag_answer_service.answer_with_rag(query, group_id, max_results)
+class QueueEvaluationRequest(BaseModel):
+    group_id: str
+    queries: list[EvaluationQuery]
+    snapshot_id: str
+    rubrics: list[str] | None = None
+    models: list[str]
 
-    evaluated_content = await evaluation_service.evaluate_pydantic(
-        query,
-        expected_answer,
-        answer,
+
+@router.post("/evaluation")
+async def queue_evaluation(request: QueueEvaluationRequest) -> JSONResponse:
+    """Enqueue a RAG evaluation request for background processing."""
+    run = await evaluation_service.create_evaluation_run(
+        request.group_id,
+        request.queries,
+        request.snapshot_id,
+        request.rubrics,
+        request.models,
     )
+    return JSONResponse(status_code=202, content=run.model_dump())
 
-    return JSONResponse(content=evaluated_content)
+
+@router.get("/evaluation")
+async def list_runs() -> JSONResponse:
+    """List all evaluation runs with their run_id, status and a link to results."""
+    runs = await runs_repository.list_runs()
+    for run in runs:
+        run["results_url"] = f"/evaluation/{run['run_id']}"
+    return JSONResponse(content={"runs": runs})
 
 
-@router.get("/rag/answer")
-async def rag_answer(
-    group_id: Annotated[str, Query(description="Knowledge group ID")],
-    query: Annotated[str, Query(description="Question to answer")],
-    max_results: Annotated[
-        int, Query(ge=1, le=100, description="Maximum number of context documents")
-    ] = 5,
-) -> JSONResponse:
-    """Answer a question using RAG context retrieved from the evaluation-data service."""
-    answer = await rag_answer_service.answer_with_rag(query, group_id, max_results)
-    return JSONResponse(content={"answer": answer})
+@router.get("/evaluation/{run_id}")
+async def get_run_results(run_id: str) -> JSONResponse:
+    """Return the full results for a single evaluation run."""
+    run = await runs_repository.get_run(run_id)
+    if run is None:
+        return JSONResponse(status_code=404, content={"detail": "Run not found"})
+    return JSONResponse(content=run.model_dump())

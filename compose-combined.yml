@@ -19,7 +19,8 @@ services:
       LOCALSTACK_HOST: 127.0.0.1
     volumes:
       - "${TMPDIR:-/tmp}/localstack:/var/lib/localstack"
-      - ../ai-uc-rag-evaluation-data/compose/start-localstack.sh:/etc/localstack/init/ready.d/start-localstack.sh
+      - ./compose/start-localstack.sh:/etc/localstack/init/ready.d/01_start-localstack.sh
+      - ../ai-uc-rag-evaluation-data/compose/start-localstack.sh:/etc/localstack/init/ready.d/02_start-localstack.sh
     healthcheck:
       test: ["CMD", "curl", "localhost:4566"]
       interval: 5s
@@ -136,6 +137,7 @@ services:
       MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017/}
       HOST: ${HOST:-0.0.0.0}
       LOCALSTACK_URL: ${LOCALSTACK_URL:-http://localstack:4566}
+      UPLOAD_CALLBACK_BASE_URL: http://evaluation-data:8085
     volumes:
       - ../ai-uc-rag-evaluation-data/app:/home/nonroot/app
     develop:
