@@ -6,7 +6,7 @@ from logging import getLogger
 import boto3
 from mypy_boto3_sqs import SQSClient
 
-import app.config as config
+from app import config
 
 logger = getLogger(__name__)
 
