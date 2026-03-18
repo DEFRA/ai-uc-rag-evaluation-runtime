@@ -5,6 +5,8 @@ import pydantic_evals.evaluators
 from pydantic_ai import models
 from pydantic_ai.models.bedrock import BedrockConverseModel, BedrockModelSettings
 from pydantic_ai.providers.bedrock import BedrockProvider
+from pydantic_ai.settings import ModelSettings
+from pydantic_evals.evaluators import OutputConfig
 
 from app import config
 from app.evaluation.models import EvaluationResult
@@ -42,10 +44,22 @@ _settings = (
 def _build_configured_models() -> dict[str, models.Model]:
     return {
         key: BedrockConverseModel(
-            entry["arn"] or entry["model_id"],
+            entry["model_id"],
             provider=_provider,
-            profile=_provider.model_profile(entry["model_id"]),
-            settings=_settings,
+            settings=BedrockModelSettings(
+                **(
+                    {
+                        "bedrock_guardrail_config": {
+                            "guardrailIdentifier": _judge_config.guardrails_id,
+                            "guardrailVersion": _judge_config.guardrails_version,
+                            "trace": "enabled",
+                        }
+                    }
+                    if _judge_config.guardrails_id
+                    else {}
+                ),
+                **({"bedrock_inference_profile": entry["arn"]} if entry["arn"] else {}),
+            ),
         )
         for key, entry in config.config.llm_as_a_judge_config.models.items()
     }
@@ -60,11 +74,11 @@ def _make_judge(
     return pydantic_evals.evaluators.LLMJudge(
         model=judge_model,
         rubric=rubric,
-        score={"evaluation_name": "AnswerMatcher"},
-        model_settings={
-            "temperature": _judge_config.temperature,
-            "max_tokens": _judge_config.max_tokens,
-        },
+        score=OutputConfig(evaluation_name="AnswerMatcher"),
+        model_settings=ModelSettings(
+            temperature=_judge_config.temperature,
+            max_tokens=_judge_config.max_tokens,
+        ),
         include_input=True,
         include_expected_output=True,
     )
