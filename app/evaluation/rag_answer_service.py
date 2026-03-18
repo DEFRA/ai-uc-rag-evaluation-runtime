@@ -11,22 +11,28 @@ logger = getLogger(__name__)
 
 _cfg = config.config.llm_config
 _provider = BedrockProvider(region_name=config.config.aws_region)
-_settings = (
-    BedrockModelSettings(
-        bedrock_guardrail_config={
-            "guardrailIdentifier": _cfg.guardrails_id,
-            "guardrailVersion": _cfg.guardrails_version,
-            "trace": "enabled",
+_settings = BedrockModelSettings(
+    **(
+        {
+            "bedrock_guardrail_config": {
+                "guardrailIdentifier": _cfg.guardrails_id,
+                "guardrailVersion": _cfg.guardrails_version,
+                "trace": "enabled",
+            }
         }
-    )
-    if _cfg.guardrails_id
-    else None
+        if _cfg.guardrails_id
+        else {}
+    ),
+    **(
+        {"bedrock_inference_profile": _cfg.inference_profile_arn}
+        if _cfg.inference_profile_arn
+        else {}
+    ),
 )
 
 _model: models.Model = BedrockConverseModel(
-    _cfg.inference_profile_arn or _cfg.model_id,
+    _cfg.model_id,
     provider=_provider,
-    profile=_provider.model_profile(_cfg.model_id),
     settings=_settings,
 )
 

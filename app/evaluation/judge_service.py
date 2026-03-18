@@ -1,17 +1,15 @@
-from logging import getLogger
+import logging
 
 import pydantic_evals
 import pydantic_evals.evaluators
-from pydantic_ai import models
-from pydantic_ai.models.bedrock import BedrockConverseModel, BedrockModelSettings
-from pydantic_ai.providers.bedrock import BedrockProvider
-from pydantic_ai.settings import ModelSettings
-from pydantic_evals.evaluators import OutputConfig
+from pydantic_ai import models, settings
+from pydantic_ai.models import bedrock as bedrock_models
+from pydantic_ai.providers import bedrock as bedrock_providers
 
 from app import config
-from app.evaluation.models import EvaluationResult
+from app.evaluation import models as evaluation_models
 
-logger = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 DEFAULT_RUBRIC = """
 You are evaluating whether an answer correctly and completely addresses a question based on an expected answer.
@@ -27,9 +25,9 @@ Focus on factual accuracy and completeness relative to the expected answer. Igno
 """
 
 _judge_config = config.config.llm_as_a_judge_config
-_provider = BedrockProvider(region_name=config.config.aws_region)
+_provider = bedrock_providers.BedrockProvider(region_name=config.config.aws_region)
 _settings = (
-    BedrockModelSettings(
+    bedrock_models.BedrockModelSettings(
         bedrock_guardrail_config={
             "guardrailIdentifier": _judge_config.guardrails_id,
             "guardrailVersion": _judge_config.guardrails_version,
@@ -43,10 +41,10 @@ _settings = (
 
 def _build_configured_models() -> dict[str, models.Model]:
     return {
-        key: BedrockConverseModel(
+        key: bedrock_models.BedrockConverseModel(
             entry["model_id"],
             provider=_provider,
-            settings=BedrockModelSettings(
+            settings=bedrock_models.BedrockModelSettings(
                 **(
                     {
                         "bedrock_guardrail_config": {
@@ -74,8 +72,8 @@ def _make_judge(
     return pydantic_evals.evaluators.LLMJudge(
         model=judge_model,
         rubric=rubric,
-        score=OutputConfig(evaluation_name="AnswerMatcher"),
-        model_settings=ModelSettings(
+        score=pydantic_evals.evaluators.OutputConfig(evaluation_name="AnswerMatcher"),
+        model_settings=settings.ModelSettings(
             temperature=_judge_config.temperature,
             max_tokens=_judge_config.max_tokens,
         ),
@@ -90,7 +88,7 @@ async def evaluate_with_judge(
     actual_answer: str,
     model_key: str,
     rubric: str,
-) -> EvaluationResult:
+) -> evaluation_models.EvaluationResult:
     if model_key not in _models:
         msg = f"No model configured for '{model_key}'"
         raise ValueError(msg)
@@ -111,7 +109,7 @@ async def evaluate_with_judge(
 
     score = score_entry.value if score_entry else None
     reason = case_result.assertions.get("LLMJudge_pass")
-    return EvaluationResult(
+    return evaluation_models.EvaluationResult(
         question=question,
         expected_answer=expected_answer,
         actual_answer=actual_answer,
