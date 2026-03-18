@@ -199,3 +199,4 @@ compose/secrets.env
 
 coverage*
 /CLAUDE.md
+.mcp.json

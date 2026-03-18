@@ -1,0 +1,41 @@
+@startuml Evaluation Flow
+
+title ai-uc-rag-evaluation-runtime
+
+actor Client
+participant FastAPI
+queue "SQS Queue" as SQS
+participant Listener
+participant "RAG Search" as RAG
+participant "LLM Judge" as LLM
+database "Results Store" as Results
+
+== Submit Evaluation ==
+
+Client -> FastAPI : POST /evaluation
+FastAPI -> Results : persist evaluation run
+FastAPI -> SQS : enqueue message
+FastAPI --> Client : 200 OK { run_id }
+
+
+== Async / Background Worker ==
+
+SQS -> Listener : consume
+    Listener -> Results : load evaluation run
+    Results --> Listener : EvaluationRun
+    Listener -> RAG : search(query)
+    RAG --> Listener : results
+loop for each model and rubric
+    Listener -> LLM : evaluate(query, results)
+    LLM --> Listener : score
+    Listener -> Results : add result
+end
+
+== Poll for Result ==
+
+Client -> FastAPI : GET /evaluation/{run_id}
+FastAPI -> Results : lookup(run_id)
+Results --> FastAPI : score
+FastAPI --> Client : 200 OK { score }
+
+@enduml
