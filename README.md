@@ -1,5 +1,8 @@
 # ai-uc-rag-evaluation-runtime
 
+A Python-based FastAPI service providing an example implementation of a Retrieval-Augmented Generation (RAG) evaluation 
+runtime. It demonstrates LLM-as-a-judge evaluation patterns for RAG pipelines, built on the DEFRA CDP platform.
+
 - [ai-uc-rag-evaluation-runtime](#ai-uc-rag-evaluation-runtime)
   - [Requirements](#requirements)
     - [Python](#python)
