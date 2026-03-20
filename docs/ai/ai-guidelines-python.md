@@ -100,6 +100,7 @@ Tests SHOULD be runnable via:
 
 ### 3.1 Style & Linting
 
+- Follow https://google.github.io/styleguide/pyguide.html
 - Follow **PEP 8** and idiomatic Python style.
 - Use **`ruff`** as the single source of truth for linting and formatting rules.
 
