@@ -5,28 +5,27 @@ import json
 from pytest_mock import MockerFixture
 
 from app.evaluation import judge_service as evaluation_service
-from app.evaluation import queue_listener, rag_answer_service, runs_repository
-from app.evaluation.models import EvaluationQuery, EvaluationResult, EvaluationRun
+from app.evaluation import models, queue_listener, rag_answer_service, runs_repository
 
 
-def _make_run(**kwargs: object) -> EvaluationRun:
+def _make_run(**kwargs: object) -> models.EvaluationRun:
     defaults: dict = {
         "run_id": "run-1",
         "status": "accepted",
         "group_id": "group1",
         "queries": [
-            EvaluationQuery(query="question 1", expected_answer="answer 1"),
-            EvaluationQuery(query="question 2", expected_answer="answer 2"),
+            models.EvaluationQuery(query="question 1", expected_answer="answer 1"),
+            models.EvaluationQuery(query="question 2", expected_answer="answer 2"),
         ],
         "snapshot_id": "snapshot-id",
         "rubrics": None,
         "models": ["model1"],
         "results": [],
     }
-    return EvaluationRun(**{**defaults, **kwargs})
+    return models.EvaluationRun(**{**defaults, **kwargs})
 
 
-def _make_result(**kwargs: object) -> EvaluationResult:
+def _make_result(**kwargs: object) -> models.EvaluationResult:
     defaults: dict = {
         "question": "question 1",
         "expected_answer": "answer 1",
@@ -36,7 +35,7 @@ def _make_result(**kwargs: object) -> EvaluationResult:
         "score": 1.0,
         "reason": "correct",
     }
-    return EvaluationResult(**{**defaults, **kwargs})
+    return models.EvaluationResult(**{**defaults, **kwargs})
 
 
 async def test_listen_processes_queries(mocker: MockerFixture) -> None:
@@ -67,6 +66,7 @@ async def test_listen_processes_queries(mocker: MockerFixture) -> None:
     mock_append_result = mocker.patch.object(
         runs_repository, "append_result", new=mocker.AsyncMock(return_value=None)
     )
+    mocker.patch.object(runs_repository, "save_summary", new=mocker.AsyncMock())
     mock_answer = mocker.patch.object(
         rag_answer_service,
         "answer_with_rag",
@@ -178,7 +178,9 @@ async def test_listen_skips_already_completed_combinations(
     model_key = "model1"
     existing_result = _make_result(model=model_key)
     run = _make_run(
-        queries=[EvaluationQuery(query="question 1", expected_answer="answer 1")],
+        queries=[
+            models.EvaluationQuery(query="question 1", expected_answer="answer 1")
+        ],
         results=[existing_result],
     )
 
@@ -204,6 +206,7 @@ async def test_listen_skips_already_completed_combinations(
     mocker.patch.object(
         runs_repository, "append_result", new=mocker.AsyncMock(return_value=None)
     )
+    mocker.patch.object(runs_repository, "save_summary", new=mocker.AsyncMock())
     mocker.patch.object(
         rag_answer_service,
         "answer_with_rag",
@@ -219,3 +222,41 @@ async def test_listen_skips_already_completed_combinations(
         await queue_listener.listen()
 
     mock_evaluate.assert_not_awaited()
+
+
+def test_summarise_run_groups_by_model_and_rubric(mocker: MockerFixture) -> None:
+    mocker.patch(
+        "app.evaluation.queue_listener.config.config.llm_as_a_judge_config.score_threshold",
+        0.5,
+    )
+    results = [
+        _make_result(model="model1", rubric="rubric1", score=0.8),
+        _make_result(model="model1", rubric="rubric1", score=0.6),
+        _make_result(model="model2", rubric="rubric1", score=0.4),
+    ]
+
+    summary = queue_listener._summarise_run(results)
+
+    assert len(summary) == 2
+    m1 = next(s for s in summary if s.model == "model1")
+    assert m1.average_score == 0.7
+    assert m1.passed is True
+    m2 = next(s for s in summary if s.model == "model2")
+    assert m2.average_score == 0.4
+    assert m2.passed is False
+
+
+def test_summarise_run_ignores_none_scores(mocker: MockerFixture) -> None:
+    mocker.patch(
+        "app.evaluation.queue_listener.config.config.llm_as_a_judge_config.score_threshold",
+        0.5,
+    )
+    results = [
+        _make_result(model="model1", rubric="rubric1", score=None),
+        _make_result(model="model1", rubric="rubric1", score=1.0),
+    ]
+
+    summary = queue_listener._summarise_run(results)
+
+    assert len(summary) == 1
+    assert summary[0].average_score == 1.0

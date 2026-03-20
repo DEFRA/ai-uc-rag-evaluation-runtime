@@ -8,8 +8,7 @@ from mypy_boto3_sqs import SQSClient
 from mypy_boto3_sqs.type_defs import MessageTypeDef
 
 from app import config
-from app.evaluation import judge_service, rag_answer_service, runs_repository
-from app.evaluation.models import EvaluationRun
+from app.evaluation import judge_service, models, rag_answer_service, runs_repository
 
 logger = getLogger(__name__)
 
@@ -57,7 +56,31 @@ async def _process(queue_url: str, msg: MessageTypeDef) -> None:
     await asyncio.to_thread(_delete_message, queue_url, msg["ReceiptHandle"])
 
 
-async def _execute_run(run: EvaluationRun, run_id: str) -> None:
+def _summarise_run(
+    results: list[models.EvaluationResult],
+) -> list[models.EvaluationSummary]:
+    threshold = config.config.llm_as_a_judge_config.score_threshold
+    groups: dict[tuple[str, str], list[float]] = {}
+    for result in results:
+        if result.score is not None:
+            key = (result.model, result.rubric)
+            groups.setdefault(key, []).append(result.score)
+    summaries = []
+    for (model, rubric), scores in groups.items():
+        avg = sum(scores) / len(scores)
+        passed = avg >= threshold
+        summaries.append(
+            models.EvaluationSummary(
+                model=model,
+                rubric=rubric,
+                average_score=avg,
+                passed=passed,
+            )
+        )
+    return summaries
+
+
+async def _execute_run(run: models.EvaluationRun, run_id: str) -> None:
     await runs_repository.update_status(run_id, "in_progress")
 
     effective_rubrics = run.rubrics or [judge_service.DEFAULT_RUBRIC]
@@ -74,6 +97,10 @@ async def _execute_run(run: EvaluationRun, run_id: str) -> None:
                     item.query, item.expected_answer, answer, model_key, rubric
                 )
                 await runs_repository.append_result(run_id, result)
+    updated_run = await runs_repository.get_run(run_id)
+    if updated_run:
+        summary = _summarise_run(updated_run.results)
+        await runs_repository.save_summary(run_id, summary)
     await runs_repository.update_status(run_id, "completed")
 
 
