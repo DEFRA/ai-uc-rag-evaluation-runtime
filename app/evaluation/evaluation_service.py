@@ -1,12 +1,12 @@
 import uuid
 
 from app.evaluation import runs_repository, sqs_service
-from app.evaluation.models import EvaluationQuery, EvaluationRun
+from app.evaluation.models import EvaluationRun
 
 
 async def create_evaluation_run(
     group_id: str,
-    queries: list[EvaluationQuery],
+    truth_source_id: str,
     snapshot_id: str,
     rubrics: list[str] | None,
     model_keys: list[str],
@@ -15,7 +15,7 @@ async def create_evaluation_run(
         run_id=str(uuid.uuid4()),
         status="accepted",
         group_id=group_id,
-        queries=queries,
+        truth_source_id=truth_source_id,
         snapshot_id=snapshot_id,
         rubrics=rubrics,
         models=model_keys,

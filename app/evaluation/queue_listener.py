@@ -9,6 +9,7 @@ from mypy_boto3_sqs.type_defs import MessageTypeDef
 
 from app import config
 from app.evaluation import judge_service, models, rag_answer_service, runs_repository
+from app.truth import repository as truth_repository
 
 logger = getLogger(__name__)
 
@@ -83,18 +84,24 @@ def _summarise_run(
 async def _execute_run(run: models.EvaluationRun, run_id: str) -> None:
     await runs_repository.update_status(run_id, "in_progress")
 
+    truth_source = await truth_repository.get(run.truth_source_id)
+    if truth_source is None:
+        logger.error("Truth source %s not found; skipping run %s", run.truth_source_id, run_id)
+        await runs_repository.update_status(run_id, "failed")
+        return
+
     effective_rubrics = run.rubrics or [judge_service.DEFAULT_RUBRIC]
     done = {(r.question, r.rubric, r.model) for r in run.results}
-    for item in run.queries:
+    for item in truth_source.question_answers:
         answer = await rag_answer_service.answer_with_rag(
-            item.query, run.group_id, snapshot_id=run.snapshot_id
+            item.question, run.group_id, snapshot_id=run.snapshot_id
         )
         for rubric in effective_rubrics:
             for model_key in run.models:
-                if (item.query, rubric, model_key) in done:
+                if (item.question, rubric, model_key) in done:
                     continue
                 result = await judge_service.evaluate_with_judge(
-                    item.query, item.expected_answer, answer, model_key, rubric
+                    item.question, item.answer, answer, model_key, rubric
                 )
                 await runs_repository.append_result(run_id, result)
     updated_run = await runs_repository.get_run(run_id)
