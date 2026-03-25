@@ -86,7 +86,9 @@ async def _execute_run(run: models.EvaluationRun, run_id: str) -> None:
 
     truth_source = await truth_repository.get(run.truth_source_id)
     if truth_source is None:
-        logger.error("Truth source %s not found; skipping run %s", run.truth_source_id, run_id)
+        logger.error(
+            "Truth source %s not found; skipping run %s", run.truth_source_id, run_id
+        )
         await runs_repository.update_status(run_id, "failed")
         return
 

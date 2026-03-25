@@ -6,6 +6,20 @@ from pytest_mock import MockerFixture
 
 from app.evaluation import judge_service as evaluation_service
 from app.evaluation import models, queue_listener, rag_answer_service, runs_repository
+from app.truth import repository as truth_repository
+from app.truth.models import QuestionAnswer, TruthDataSource
+
+
+def _make_truth_source(**kwargs: object) -> TruthDataSource:
+    defaults: dict = {
+        "id": "truth-1",
+        "dataset_id": "group1",
+        "question_answers": [
+            QuestionAnswer(question="question 1", answer="answer 1"),
+            QuestionAnswer(question="question 2", answer="answer 2"),
+        ],
+    }
+    return TruthDataSource(**{**defaults, **kwargs})
 
 
 def _make_run(**kwargs: object) -> models.EvaluationRun:
@@ -13,10 +27,7 @@ def _make_run(**kwargs: object) -> models.EvaluationRun:
         "run_id": "run-1",
         "status": "accepted",
         "group_id": "group1",
-        "queries": [
-            models.EvaluationQuery(query="question 1", expected_answer="answer 1"),
-            models.EvaluationQuery(query="question 2", expected_answer="answer 2"),
-        ],
+        "truth_source_id": "truth-1",
         "snapshot_id": "snapshot-id",
         "rubrics": None,
         "models": ["model1"],
@@ -59,6 +70,9 @@ async def test_listen_processes_queries(mocker: MockerFixture) -> None:
     mocker.patch("app.evaluation.queue_listener._delete_message")
     mocker.patch.object(
         runs_repository, "get_run", new=mocker.AsyncMock(return_value=_make_run())
+    )
+    mocker.patch.object(
+        truth_repository, "get", new=mocker.AsyncMock(return_value=_make_truth_source())
     )
     mock_update_status = mocker.patch.object(
         runs_repository, "update_status", new=mocker.AsyncMock(return_value=None)
@@ -132,6 +146,47 @@ async def test_listen_skips_run_not_found_in_mongo(mocker: MockerFixture) -> Non
     mock_delete.assert_called_once()
 
 
+async def test_listen_skips_when_truth_source_not_found(mocker: MockerFixture) -> None:
+    mocker.patch(
+        "app.evaluation.queue_listener.config.config.rag_evaluation_start_queue_url",
+        "http://localhost:4566/000000000000/rag_evaluation_start.fifo",
+    )
+
+    call_count = 0
+
+    def fake_receive(_queue_url: str) -> dict | None:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return {"Body": json.dumps({"run_id": "run-1"}), "ReceiptHandle": "h1"}
+        raise asyncio.CancelledError
+
+    mocker.patch(
+        "app.evaluation.queue_listener._receive_message", side_effect=fake_receive
+    )
+    mocker.patch("app.evaluation.queue_listener._delete_message")
+    mocker.patch.object(
+        runs_repository, "get_run", new=mocker.AsyncMock(return_value=_make_run())
+    )
+    mocker.patch.object(
+        truth_repository, "get", new=mocker.AsyncMock(return_value=None)
+    )
+    mock_update_status = mocker.patch.object(
+        runs_repository, "update_status", new=mocker.AsyncMock(return_value=None)
+    )
+    mock_answer = mocker.patch.object(
+        rag_answer_service,
+        "answer_with_rag",
+        new=mocker.AsyncMock(return_value="the answer"),
+    )
+
+    with contextlib.suppress(asyncio.CancelledError):
+        await queue_listener.listen()
+
+    mock_answer.assert_not_awaited()
+    mock_update_status.assert_any_await("run-1", "failed")
+
+
 async def test_listen_continues_after_processing_exception(
     mocker: MockerFixture,
 ) -> None:
@@ -177,11 +232,9 @@ async def test_listen_skips_already_completed_combinations(
 
     model_key = "model1"
     existing_result = _make_result(model=model_key)
-    run = _make_run(
-        queries=[
-            models.EvaluationQuery(query="question 1", expected_answer="answer 1")
-        ],
-        results=[existing_result],
+    run = _make_run(results=[existing_result])
+    truth_source = _make_truth_source(
+        question_answers=[QuestionAnswer(question="question 1", answer="answer 1")]
     )
 
     call_count = 0
@@ -199,6 +252,9 @@ async def test_listen_skips_already_completed_combinations(
     mocker.patch("app.evaluation.queue_listener._delete_message")
     mocker.patch.object(
         runs_repository, "get_run", new=mocker.AsyncMock(return_value=run)
+    )
+    mocker.patch.object(
+        truth_repository, "get", new=mocker.AsyncMock(return_value=truth_source)
     )
     mocker.patch.object(
         runs_repository, "update_status", new=mocker.AsyncMock(return_value=None)

@@ -10,7 +10,7 @@ def _make_run(**kwargs: object) -> models.EvaluationRun:
         "run_id": "run-1",
         "status": "accepted",
         "group_id": "group-1",
-        "queries": [models.EvaluationQuery(query="q1", expected_answer="a1")],
+        "truth_source_id": "truth-1",
         "snapshot_id": "snap-1",
         "models": ["model1"],
     }
