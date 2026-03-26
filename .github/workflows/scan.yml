@@ -49,21 +49,21 @@ jobs:
           chmod +x ./scripts/check-unpinned-dependencies.sh
           ./scripts/check-unpinned-dependencies.sh
 
-#      - name: Run Aqua Trivy scan
-#        id: trivy-scan
-#        uses: aquasecurity/trivy-action@0.33.1
-#        with:
-#          scan-ref: .
-#          scan-type: repository
-#          format: table
-#          exit-code: 1
-#          trivyignores: .trivyignore
-#          severity: CRITICAL,HIGH,MEDIUM,LOW
-#          limit-severities-for-sarif: true
-#        continue-on-error: true
-#        env:
-#          TRIVY_INCLUDE_DEV_DEPS: "true"
-#
-#      - name: Fail if vulnerabilities found
-#        if: ${{ steps.trivy-scan.outcome == 'failure' }}
-#        run: exit 1
+      - name: Run Aqua Trivy scan
+        id: trivy-scan
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          scan-ref: .
+          scan-type: repository
+          format: table
+          exit-code: 1
+          trivyignores: .trivyignore
+          severity: CRITICAL,HIGH,MEDIUM,LOW
+          limit-severities-for-sarif: true
+        continue-on-error: true
+        env:
+          TRIVY_INCLUDE_DEV_DEPS: "true"
+
+      - name: Fail if vulnerabilities found
+        if: ${{ steps.trivy-scan.outcome == 'failure' }}
+        run: exit 1
