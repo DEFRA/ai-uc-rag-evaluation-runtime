@@ -14,17 +14,18 @@ def _make_source(**kwargs: object) -> models.TruthDataSource:
     return models.TruthDataSource(**{**defaults, **kwargs})
 
 
-async def _mock_collection(mocker: MockerFixture) -> Any:
-    col = mocker.AsyncMock()
-    mocker.patch(
-        "app.truth.repository._collection",
-        new=mocker.AsyncMock(return_value=col),
+def _make_repo(
+    mocker: MockerFixture,
+) -> tuple[repository.MongoTruthDataSourceRepository, Any]:
+    repo = repository.MongoTruthDataSourceRepository.__new__(
+        repository.MongoTruthDataSourceRepository
     )
-    return col
+    repo.collection = mocker.AsyncMock()
+    return repo, repo.collection
 
 
 async def test_list_sources_returns_summaries(mocker: MockerFixture) -> None:
-    col = await _mock_collection(mocker)
+    repo, col = _make_repo(mocker)
     mock_cursor = mocker.MagicMock()
     mock_cursor.to_list = mocker.AsyncMock(
         return_value=[
@@ -34,7 +35,7 @@ async def test_list_sources_returns_summaries(mocker: MockerFixture) -> None:
     )
     col.find = mocker.MagicMock(return_value=mock_cursor)
 
-    result = await repository.list_sources()
+    result = await repo.list_sources()
 
     assert result == [
         models.TruthDataSourceSummary(id="source-1", dataset_id="dataset-1"),
@@ -44,10 +45,10 @@ async def test_list_sources_returns_summaries(mocker: MockerFixture) -> None:
 
 
 async def test_create_inserts_document(mocker: MockerFixture) -> None:
-    col = await _mock_collection(mocker)
+    repo, col = _make_repo(mocker)
     source = _make_source()
 
-    await repository.create(source)
+    await repo.create(source)
 
     col.insert_one.assert_awaited_once_with(source.model_dump())
 
@@ -55,11 +56,11 @@ async def test_create_inserts_document(mocker: MockerFixture) -> None:
 async def test_update_question_answers_returns_true_when_found(
     mocker: MockerFixture,
 ) -> None:
-    col = await _mock_collection(mocker)
+    repo, col = _make_repo(mocker)
     col.update_one.return_value = mocker.MagicMock(matched_count=1)
     qas = [models.QuestionAnswer(question="q2", answer="a2")]
 
-    result = await repository.update_question_answers("source-1", qas)
+    result = await repo.update_question_answers("source-1", qas)
 
     assert result is True
     col.update_one.assert_awaited_once_with(
@@ -71,29 +72,29 @@ async def test_update_question_answers_returns_true_when_found(
 async def test_update_question_answers_returns_false_when_not_found(
     mocker: MockerFixture,
 ) -> None:
-    col = await _mock_collection(mocker)
+    repo, col = _make_repo(mocker)
     col.update_one.return_value = mocker.MagicMock(matched_count=0)
 
-    result = await repository.update_question_answers("missing", [])
+    result = await repo.update_question_answers("missing", [])
 
     assert result is False
 
 
 async def test_get_returns_validated_source(mocker: MockerFixture) -> None:
+    repo, col = _make_repo(mocker)
     source = _make_source()
-    col = await _mock_collection(mocker)
     col.find_one = mocker.AsyncMock(return_value=source.model_dump())
 
-    result = await repository.get("source-1")
+    result = await repo.get("source-1")
 
     assert result == source
     col.find_one.assert_awaited_once_with({"id": "source-1"}, {"_id": 0})
 
 
 async def test_get_returns_none_when_not_found(mocker: MockerFixture) -> None:
-    col = await _mock_collection(mocker)
+    repo, col = _make_repo(mocker)
     col.find_one = mocker.AsyncMock(return_value=None)
 
-    result = await repository.get("missing")
+    result = await repo.get("missing")
 
     assert result is None

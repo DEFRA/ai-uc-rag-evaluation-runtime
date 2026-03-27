@@ -8,6 +8,7 @@ from mypy_boto3_sqs import SQSClient
 from mypy_boto3_sqs.type_defs import MessageTypeDef
 
 from app import config
+from app.common import mongo
 from app.evaluation import judge_service, models, rag_answer_service, runs_repository
 from app.truth import repository as truth_repository
 
@@ -84,7 +85,10 @@ def _summarise_run(
 async def _execute_run(run: models.EvaluationRun, run_id: str) -> None:
     await runs_repository.update_status(run_id, "in_progress")
 
-    truth_source = await truth_repository.get(run.truth_source_id)
+    client = await mongo.get_mongo_client()
+    db = client.get_database(config.config.mongo_database)
+    truth_repo = truth_repository.MongoTruthDataSourceRepository(db)
+    truth_source = await truth_repo.get(run.truth_source_id)
     if truth_source is None:
         logger.error(
             "Truth source %s not found; skipping run %s", run.truth_source_id, run_id

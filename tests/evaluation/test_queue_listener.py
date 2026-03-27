@@ -6,20 +6,20 @@ from pytest_mock import MockerFixture
 
 from app.evaluation import judge_service as evaluation_service
 from app.evaluation import models, queue_listener, rag_answer_service, runs_repository
+from app.truth import models as truth_models
 from app.truth import repository as truth_repository
-from app.truth.models import QuestionAnswer, TruthDataSource
 
 
-def _make_truth_source(**kwargs: object) -> TruthDataSource:
+def _make_truth_source(**kwargs: object) -> truth_models.TruthDataSource:
     defaults: dict = {
         "id": "truth-1",
         "dataset_id": "group1",
         "question_answers": [
-            QuestionAnswer(question="question 1", answer="answer 1"),
-            QuestionAnswer(question="question 2", answer="answer 2"),
+            truth_models.QuestionAnswer(question="question 1", answer="answer 1"),
+            truth_models.QuestionAnswer(question="question 2", answer="answer 2"),
         ],
     }
-    return TruthDataSource(**{**defaults, **kwargs})
+    return truth_models.TruthDataSource(**{**defaults, **kwargs})
 
 
 def _make_run(**kwargs: object) -> models.EvaluationRun:
@@ -71,8 +71,14 @@ async def test_listen_processes_queries(mocker: MockerFixture) -> None:
     mocker.patch.object(
         runs_repository, "get_run", new=mocker.AsyncMock(return_value=_make_run())
     )
+    mocker.patch(
+        "app.evaluation.queue_listener.mongo.get_mongo_client",
+        new=mocker.AsyncMock(return_value=mocker.MagicMock()),
+    )
     mocker.patch.object(
-        truth_repository, "get", new=mocker.AsyncMock(return_value=_make_truth_source())
+        truth_repository.MongoTruthDataSourceRepository,
+        "get",
+        new=mocker.AsyncMock(return_value=_make_truth_source()),
     )
     mock_update_status = mocker.patch.object(
         runs_repository, "update_status", new=mocker.AsyncMock(return_value=None)
@@ -168,8 +174,14 @@ async def test_listen_skips_when_truth_source_not_found(mocker: MockerFixture) -
     mocker.patch.object(
         runs_repository, "get_run", new=mocker.AsyncMock(return_value=_make_run())
     )
+    mocker.patch(
+        "app.evaluation.queue_listener.mongo.get_mongo_client",
+        new=mocker.AsyncMock(return_value=mocker.MagicMock()),
+    )
     mocker.patch.object(
-        truth_repository, "get", new=mocker.AsyncMock(return_value=None)
+        truth_repository.MongoTruthDataSourceRepository,
+        "get",
+        new=mocker.AsyncMock(return_value=None),
     )
     mock_update_status = mocker.patch.object(
         runs_repository, "update_status", new=mocker.AsyncMock(return_value=None)
@@ -234,7 +246,9 @@ async def test_listen_skips_already_completed_combinations(
     existing_result = _make_result(model=model_key)
     run = _make_run(results=[existing_result])
     truth_source = _make_truth_source(
-        question_answers=[QuestionAnswer(question="question 1", answer="answer 1")]
+        question_answers=[
+            truth_models.QuestionAnswer(question="question 1", answer="answer 1")
+        ]
     )
 
     call_count = 0
@@ -253,8 +267,14 @@ async def test_listen_skips_already_completed_combinations(
     mocker.patch.object(
         runs_repository, "get_run", new=mocker.AsyncMock(return_value=run)
     )
+    mocker.patch(
+        "app.evaluation.queue_listener.mongo.get_mongo_client",
+        new=mocker.AsyncMock(return_value=mocker.MagicMock()),
+    )
     mocker.patch.object(
-        truth_repository, "get", new=mocker.AsyncMock(return_value=truth_source)
+        truth_repository.MongoTruthDataSourceRepository,
+        "get",
+        new=mocker.AsyncMock(return_value=truth_source),
     )
     mocker.patch.object(
         runs_repository, "update_status", new=mocker.AsyncMock(return_value=None)

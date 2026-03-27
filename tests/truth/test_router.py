@@ -2,12 +2,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 
-from app.truth import models, repository
-from app.truth.router import router
-
-_app = FastAPI()
-_app.include_router(router)
-client = TestClient(_app)
+from app.truth import dependencies, models, repository
+from app.truth import router as truth_router
 
 _SOURCE_ID = "source-1"
 _DATASET_ID = "dataset-1"
@@ -23,17 +19,22 @@ def _make_source(**kwargs: object) -> models.TruthDataSource:
     return models.TruthDataSource(**{**defaults, **kwargs})
 
 
+def _make_client(
+    repo: repository.AbstractTruthDataSourceRepository,
+) -> TestClient:
+    app = FastAPI()
+    app.include_router(truth_router.router)
+    app.dependency_overrides[dependencies.get_truth_repository] = lambda: repo
+    return TestClient(app)
+
+
 def test_list_truth_sources(mocker: MockerFixture) -> None:
-    mocker.patch.object(
-        repository,
-        "list_sources",
-        new=mocker.AsyncMock(
-            return_value=[
-                models.TruthDataSourceSummary(id="source-1", dataset_id="dataset-1"),
-                models.TruthDataSourceSummary(id="source-2", dataset_id="dataset-2"),
-            ]
-        ),
-    )
+    repo = mocker.AsyncMock(spec=repository.AbstractTruthDataSourceRepository)
+    repo.list_sources.return_value = [
+        models.TruthDataSourceSummary(id="source-1", dataset_id="dataset-1"),
+        models.TruthDataSourceSummary(id="source-2", dataset_id="dataset-2"),
+    ]
+    client = _make_client(repo)
 
     response = client.get("/truth-sources")
 
@@ -55,7 +56,8 @@ def test_list_truth_sources(mocker: MockerFixture) -> None:
 
 
 def test_create_truth_source(mocker: MockerFixture) -> None:
-    mocker.patch.object(repository, "create", new=mocker.AsyncMock())
+    repo = mocker.AsyncMock(spec=repository.AbstractTruthDataSourceRepository)
+    client = _make_client(repo)
 
     response = client.post(
         "/truth-sources",
@@ -67,13 +69,13 @@ def test_create_truth_source(mocker: MockerFixture) -> None:
     assert data["dataset_id"] == _DATASET_ID
     assert data["question_answers"] == _QAS
     assert data["id"]
-    repository.create.assert_awaited_once()  # type: ignore[attr-defined]
+    repo.create.assert_awaited_once()
 
 
 def test_update_question_answers_success(mocker: MockerFixture) -> None:
-    mocker.patch.object(
-        repository, "update_question_answers", new=mocker.AsyncMock(return_value=True)
-    )
+    repo = mocker.AsyncMock(spec=repository.AbstractTruthDataSourceRepository)
+    repo.update_question_answers.return_value = True
+    client = _make_client(repo)
 
     response = client.put(
         f"/truth-sources/{_SOURCE_ID}/question-answers",
@@ -82,15 +84,15 @@ def test_update_question_answers_success(mocker: MockerFixture) -> None:
 
     assert response.status_code == 200
     assert response.json()["id"] == _SOURCE_ID
-    repository.update_question_answers.assert_awaited_once_with(  # type: ignore[attr-defined]
+    repo.update_question_answers.assert_awaited_once_with(
         _SOURCE_ID, [models.QuestionAnswer(question="q1", answer="a1")]
     )
 
 
 def test_update_question_answers_not_found(mocker: MockerFixture) -> None:
-    mocker.patch.object(
-        repository, "update_question_answers", new=mocker.AsyncMock(return_value=False)
-    )
+    repo = mocker.AsyncMock(spec=repository.AbstractTruthDataSourceRepository)
+    repo.update_question_answers.return_value = False
+    client = _make_client(repo)
 
     response = client.put(
         f"/truth-sources/{_SOURCE_ID}/question-answers",
@@ -102,17 +104,21 @@ def test_update_question_answers_not_found(mocker: MockerFixture) -> None:
 
 def test_get_truth_source_success(mocker: MockerFixture) -> None:
     source = _make_source()
-    mocker.patch.object(repository, "get", new=mocker.AsyncMock(return_value=source))
+    repo = mocker.AsyncMock(spec=repository.AbstractTruthDataSourceRepository)
+    repo.get.return_value = source
+    client = _make_client(repo)
 
     response = client.get(f"/truth-sources/{_SOURCE_ID}")
 
     assert response.status_code == 200
     assert response.json() == source.model_dump()
-    repository.get.assert_awaited_once_with(_SOURCE_ID)  # type: ignore[attr-defined]
+    repo.get.assert_awaited_once_with(_SOURCE_ID)
 
 
 def test_get_truth_source_not_found(mocker: MockerFixture) -> None:
-    mocker.patch.object(repository, "get", new=mocker.AsyncMock(return_value=None))
+    repo = mocker.AsyncMock(spec=repository.AbstractTruthDataSourceRepository)
+    repo.get.return_value = None
+    client = _make_client(repo)
 
     response = client.get("/truth-sources/unknown")
 
