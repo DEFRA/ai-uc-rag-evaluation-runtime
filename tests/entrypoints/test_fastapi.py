@@ -3,7 +3,7 @@ from pytest_mock import MockerFixture
 
 from app.entrypoints.fastapi import app
 from app.evaluation import evaluation_service, runs_repository
-from app.evaluation.models import EvaluationQuery, EvaluationRun
+from app.evaluation.models import EvaluationRun
 
 client = TestClient(app)
 
@@ -41,10 +41,7 @@ def _make_run(**kwargs: object) -> EvaluationRun:
         "run_id": "test-run-id",
         "status": "accepted",
         "group_id": "g1",
-        "queries": [
-            EvaluationQuery(query="question 1", expected_answer="answer 1"),
-            EvaluationQuery(query="question 2", expected_answer="answer 2"),
-        ],
+        "truth_source_id": "truth-1",
         "snapshot_id": "snap-1",
         "models": ["sonnet"],
     }
@@ -63,10 +60,7 @@ def test_queue_evaluation_success(mocker: MockerFixture) -> None:
         "/evaluation",
         json={
             "group_id": "g1",
-            "queries": [
-                {"query": "question 1", "expected_answer": "answer 1"},
-                {"query": "question 2", "expected_answer": "answer 2"},
-            ],
+            "truth_source_id": "truth-1",
             "models": ["sonnet"],
             "snapshot_id": "snap-1",
         },
@@ -114,7 +108,7 @@ def test_get_run_results(mocker: MockerFixture) -> None:
         run_id="run-1",
         status="completed",
         group_id="g1",
-        queries=[],
+        truth_source_id="truth-1",
         snapshot_id="snapshot-id",
         models=["model1"],
     )
@@ -156,7 +150,7 @@ def test_queue_evaluation_not_configured(mocker: MockerFixture) -> None:
         "/evaluation",
         json={
             "group_id": "g1",
-            "queries": [{"query": "q", "expected_answer": "a"}],
+            "truth_source_id": "truth-1",
             "models": ["sonnet"],
             "snapshot_id": "snap-1",
         },

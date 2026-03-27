@@ -1,7 +1,6 @@
 from pytest_mock import MockerFixture
 
 from app.evaluation import evaluation_service, runs_repository, sqs_service
-from app.evaluation.models import EvaluationQuery
 
 
 async def test_create_evaluation_run_persists_and_enqueues(
@@ -14,10 +13,9 @@ async def test_create_evaluation_run_persists_and_enqueues(
         sqs_service, "enqueue_evaluation", new=mocker.AsyncMock(return_value=None)
     )
 
-    queries = [EvaluationQuery(query="q1", expected_answer="a1")]
     run = await evaluation_service.create_evaluation_run(
         group_id="g1",
-        queries=queries,
+        truth_source_id="truth-1",
         snapshot_id="snap-1",
         rubrics=["custom rubric"],
         model_keys=["sonnet"],
@@ -25,7 +23,7 @@ async def test_create_evaluation_run_persists_and_enqueues(
 
     assert run.status == "accepted"
     assert run.group_id == "g1"
-    assert run.queries == queries
+    assert run.truth_source_id == "truth-1"
     assert run.snapshot_id == "snap-1"
     assert run.rubrics == ["custom rubric"]
     assert run.models == ["sonnet"]

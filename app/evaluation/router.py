@@ -3,14 +3,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.evaluation import evaluation_service, runs_repository
-from app.evaluation.models import EvaluationQuery
 
 router = APIRouter(tags=["evaluation"])
 
 
 class QueueEvaluationRequest(BaseModel):
     group_id: str
-    queries: list[EvaluationQuery]
+    truth_source_id: str
     snapshot_id: str
     rubrics: list[str] | None = None
     models: list[str]
@@ -21,7 +20,7 @@ async def queue_evaluation(request: QueueEvaluationRequest) -> JSONResponse:
     """Enqueue a RAG evaluation request for background processing."""
     run = await evaluation_service.create_evaluation_run(
         request.group_id,
-        request.queries,
+        request.truth_source_id,
         request.snapshot_id,
         request.rubrics,
         request.models,

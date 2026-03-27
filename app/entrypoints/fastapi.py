@@ -16,6 +16,7 @@ from app.evaluation.queue_listener import listen
 from app.evaluation.router import router as evaluation_router
 from app.example.router import router as example_router
 from app.health.router import router as health_router
+from app.truth.router import router as truth_router
 
 logger = getLogger(__name__)
 
@@ -63,6 +64,7 @@ app.add_middleware(TraceIdMiddleware)
 # Setup Routes
 app.include_router(health_router)
 app.include_router(evaluation_router)
+app.include_router(truth_router)
 app.include_router(example_router)
 
 
